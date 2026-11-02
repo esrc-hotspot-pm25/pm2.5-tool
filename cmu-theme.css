@@ -93,3 +93,45 @@ main{padding-top:14px}
 .info{background:#F3E3A8;color:#4F3F00}
 input,select,textarea{border-color:var(--line2);border-radius:var(--r-sm)}
 input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(--acc) 35%,transparent)}
+
+/* ชื่อกลางสำหรับบล็อกควบคุม */
+:root{--c-panel:var(--panel);--c-line:var(--line);--c-line2:var(--line2);--c-ink:var(--ink);--c-en:var(--wine);--c-ln:var(--acc)}
+
+/* ==========================================================
+   ชุดควบคุมกลาง — ข้อความบล็อกนี้เหมือนกันทั้ง 2 เว็บ (ปุ่ม · ช่องเลือก · ช่องกรอก · แท็บ · ENSO)
+   ต่างกันแค่สีเน้น (--acc) ของแต่ละเว็บ
+   ========================================================== */
+.btn{height:var(--h)!important;display:inline-flex!important;align-items:center;justify-content:center;gap:6px;padding:0 12px!important;font-family:inherit!important;font-size:13.5px!important;font-weight:400;line-height:1;border:1px solid var(--c-line2)!important;border-radius:var(--r-sm)!important;background:var(--c-panel)!important;color:var(--c-ink)!important;box-shadow:0 2px 0 var(--c-line);text-decoration:none;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--acc)!important;color:var(--acc)!important;transform:translateY(-1px)}
+.btn:active{transform:translateY(1px);box-shadow:none}
+.btn.pri,.btn.bp{background:var(--acc)!important;color:var(--accink)!important;border-color:var(--acc)!important;font-weight:600;box-shadow:0 2px 0 rgba(0,0,0,.25)}
+.btn.pri:hover,.btn.bp:hover{color:var(--accink)!important;filter:brightness(1.12)}
+.btn.s,.btn.bsm{height:26px!important;padding:0 9px!important;font-size:12.5px!important}
+.btn.icon{width:var(--h);padding:0!important}
+.btn.icon svg{width:18px;height:18px}
+.ti-sun{display:none}[data-theme=dark] .ti-sun{display:block}[data-theme=dark] .ti-moon{display:none}
+select{height:var(--h)!important;font-family:inherit!important;font-size:13.5px!important;padding:0 8px!important;border:1px solid var(--c-line2)!important;border-radius:var(--r-sm)!important;background:var(--c-panel)!important;color:var(--c-ink)!important}
+input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=color]),textarea{font-family:inherit;font-size:13.5px;padding:0 9px;border:1px solid var(--c-line2);border-radius:var(--r-sm);background:var(--c-panel);color:var(--c-ink)}
+:not(td)>input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=color]){height:var(--h)}
+textarea{padding:6px 9px}
+select:focus,input:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(--acc) 35%,transparent);outline-offset:0;border-color:var(--acc)}
+
+/* ENSO: จุด = ระดับ (●○○ อ่อน · ●●○ ปานกลาง · ●●● แรง) + พื้นเข้มขึ้นตามระดับ */
+.sdots{display:inline-flex;gap:2px;vertical-align:middle}
+.sdots i{display:block;width:7px;height:7px;border-radius:50%;border:1.5px solid currentColor;box-sizing:border-box}
+.sdots[data-n="1"] i:nth-child(1),.sdots[data-n="2"] i:nth-child(-n+2),.sdots[data-n="3"] i{background:currentColor}
+.yr-btn.s-weak:not(.selected),.lgk.s-weak,.chip.s-weak:not(.on){background:color-mix(in srgb,currentColor 7%,var(--c-panel))}
+.yr-btn.s-moderate:not(.selected),.lgk.s-moderate,.chip.s-moderate:not(.on){background:color-mix(in srgb,currentColor 17%,var(--c-panel))}
+.yr-btn.s-strong:not(.selected),.lgk.s-strong,.chip.s-strong:not(.on){background:color-mix(in srgb,currentColor 30%,var(--c-panel))}
+.yr-btn.s-strong{border-width:3px}
+.yr-btn{width:72px!important;height:58px!important}
+.yr-btn .es-y{font-size:13.5px;font-weight:700}
+.yr-btn .es-l{font-size:10.5px;font-weight:600}
+.es-leg{display:flex;flex-wrap:wrap;align-items:center;gap:5px 6px;margin-left:auto;font-size:12px}
+.es-leg b{margin-left:8px;font-weight:700}.es-leg b:first-child{margin-left:0}
+.es-leg b.en,.lgk.en{color:var(--c-en)}.es-leg b.ln,.lgk.ln{color:var(--c-ln)}
+.lgk{display:inline-flex;align-items:center;gap:5px;border:1.5px solid currentColor;border-radius:999px;padding:1px 9px;font-size:12px;font-weight:600}
+.chip{min-width:72px}
+.chip u{text-decoration:none;font-size:10.5px;font-weight:600;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.chip.cEN u{color:var(--c-en)}.chip.cLN u{color:var(--c-ln)}
+.rchip .sdots{margin:0 2px 0 3px}

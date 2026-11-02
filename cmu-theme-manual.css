@@ -1,0 +1,13 @@
+/* PM2.5 Webtool — ธีมหน้าตาสำหรับ manual.html (ลบบรรทัด <link> ออกก็กลับเป็นเดิม)
+   หมายเหตุ: ภาพหน้าจอใน docs/img ยังเป็นหน้าตาเดิม จะตรงกับเว็บใหม่เมื่อถ่ายภาพใหม่ */
+@font-face{font-family:'CMU';src:url('fonts/CMU-Light.woff2') format('woff2');font-weight:300;font-display:swap}
+@font-face{font-family:'CMU';src:url('fonts/CMU-Regular.woff2') format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'CMU';src:url('fonts/CMU-Bold.woff2') format('woff2');font-weight:600 700;font-display:swap}
+@font-face{font-family:'CMU';src:url('fonts/CMU-Italic.woff2') format('woff2');font-weight:400;font-style:italic;font-display:swap}
+:root{--ink:#1C1917;--mute:#5A4F47;--line:#D0C5BC;--acc:#1F3A5F;--soft:#ECE5DE;--warn:#F3E3A8;--bad:#F1DDD4;--ok:#DDE3EC}
+body{background:#E3DCD6;font-family:'CMU','Sarabun','Noto Sans Thai',Tahoma,sans-serif;font-size:15.5px}
+header.top{border-bottom:4px solid;border-image:linear-gradient(90deg,#6B1F2A,#A33E1D,#B08900,#6A4A91,#1F3A5F) 1}
+nav.toc,section{background:#F8F5F2;border-color:var(--line)}
+h2{color:#6B1F2A}
+.box.tip{border-color:#1F3A5F}.box.warn{border-color:#B08900}.box.bad{border-color:#6B1F2A}
+kbd{background:#F8F5F2;border-color:#A89A8E}

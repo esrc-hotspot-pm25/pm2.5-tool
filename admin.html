@@ -49,6 +49,7 @@ pre.log{background:var(--soft);padding:10px;border-radius:8px;white-space:pre-wr
 #err{display:none;background:#fde8e4;color:#8a2616;padding:8px 22px;font-size:13px}
 @media(max-width:700px){.top,.tabs,main{padding-left:12px;padding-right:12px}}
 </style>
+<link rel="stylesheet" href="cmu-theme.css">
 </head>
 <body>
 <div id="err"></div>
@@ -105,7 +106,7 @@ pre.log{background:var(--soft);padding:10px;border-radius:8px;white-space:pre-wr
 <section id="pg-cov" class="pg">
   <div class="card">
     <h2>ความครบถ้วนของข้อมูล (จำนวนวันที่มีค่าในแต่ละปี)</h2>
-    <p class="note">สีเขียว ≥ 90% · เหลือง 75–89% · ส้ม 1–74% · เทา = ไม่มีข้อมูล · คลิกช่องเพื่อไปแก้ไขข้อมูลปีนั้น</p>
+    <p class="note">สีกรมท่าอ่อน ≥ 90% · เหลือง 75–89% · ส้มอิฐอ่อน 1–74% · เทา = ไม่มีข้อมูล · คลิกช่องเพื่อไปแก้ไขข้อมูลปีนั้น</p>
     <div class="wrap"><table class="t cov" id="cov-table"></table></div>
   </div>
 </section>
@@ -460,7 +461,7 @@ function renderCov(){
       ys.forEach(y=>{
         let n=0;((DB.daily[s.code]||{})[y]||[]).forEach(a=>a.forEach(v=>{if(v!=null)n++;}));
         const tot=dim(y,2)===29?366:365,r=n/tot;
-        const bg=!n?'#eceff2':r>=.9?'#cfeedd':r>=.75?'#fbf0b8':'#fddcb6';
+        const bg=!n?'#E6DED8':r>=.9?'#D5DCE8':r>=.75?'#F3E3A8':'#F0D5CA';
         h+='<td data-s="'+esc(s.code)+'" data-y="'+y+'" style="background:'+bg+'" title="'+n+'/'+tot+' วัน">'+(n||'')+'</td>';
       });
       h+='</tr>';

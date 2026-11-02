@@ -1,0 +1,95 @@
+/* ==========================================================
+   PM2.5 Webtool — ธีมหน้าตา (CMU Air Analysis)
+   ไฟล์นี้ซ้อนทับสไตล์เดิมของเว็บ — ลบบรรทัด <link href="cmu-theme.css"> ออกก็กลับเป็นหน้าตาเดิม
+   ฟอนต์: CMU Font © มหาวิทยาลัยเชียงใหม่ (ไฟล์ต้นฉบับ ไม่ดัดแปลง — ดู fonts/LICENSE.txt)
+   สี: กรมท่า (PM2.5) · ไวน์ · พื้นเบจเทาน้ำตาล — สเกลรายวันคงสีมาตรฐาน AQI (ปรับเฉดให้เข้ม)
+   ========================================================== */
+@font-face{font-family:'CMU';src:url('fonts/CMU-Light.woff2') format('woff2');font-weight:300;font-style:normal;font-display:swap}
+@font-face{font-family:'CMU';src:url('fonts/CMU-Regular.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'CMU';src:url('fonts/CMU-Bold.woff2') format('woff2');font-weight:600 700;font-style:normal;font-display:swap}
+@font-face{font-family:'CMU';src:url('fonts/CMU-Italic.woff2') format('woff2');font-weight:400;font-style:italic;font-display:swap}
+@font-face{font-family:'CMU Typewriter';src:url('https://cdn.jsdelivr.net/gh/dreampulse/computer-modern-web-font@master/fonts/cmuntt.woff') format('woff');font-display:swap}
+
+:root{
+  --bg:#E3DCD6; --panel:#F8F5F2; --soft:#ECE5DE; --line:#D0C5BC; --line2:#A89A8E;
+  --ink:#1C1917; --mute:#5A4F47;
+  --acc:#1F3A5F; --accink:#fff;      /* PM2.5 = กรมท่า */
+  --wine:#6B1F2A;
+  --hl:#F3E3A8; --hover:rgba(31,58,95,.2);
+  /* แผนที่ — โทนอุ่นให้เข้ากับพื้น */
+  --land:#EFE8DA; --landline:#A89A8E; --ctry:#D8D0C7; --thai:#E3DACD; --pline:#3A2F2A;
+  --mono:'CMU Typewriter','Consolas','Courier New',monospace;
+  --r:10px; --r-sm:7px; --h:32px;
+}
+[data-theme=dark]{
+  --bg:#171412; --panel:#221D1A; --soft:#2B2420; --line:#3B322C; --line2:#5A4C42;
+  --ink:#EEE8E2; --mute:#AFA195;
+  --acc:#8FB0DC; --accink:#0B1626; --wine:#E08A92;
+  --hl:#4A3B14; --hover:rgba(143,176,220,.28);
+  --land:#322A26; --landline:#5A4C42; --ctry:#241E1B; --thai:#2B2420; --pline:#CBB9AE;
+}
+body{font:14px/1.5 'CMU','Sarabun','Noto Sans Thai',Tahoma,sans-serif}
+button,select,input,textarea{font-family:inherit}
+
+/* หัวเว็บ + แถบไล่สี (ลายเซ็น) */
+.top{border-top:4px solid;border-image:linear-gradient(90deg,#6B1F2A,#A33E1D,#B08900,#6A4A91,#1F3A5F) 1;padding-top:8px;padding-bottom:8px}
+.top h1{font-size:18px}
+.top p{font-size:12.5px}
+
+/* ปุ่ม / ช่องเลือก: สูงเท่ากัน + ขอบล่างหนา (กดได้จริง) */
+.btn,select,.seg button{font-size:13.5px}
+.btn{height:var(--h);display:inline-flex;align-items:center;padding:0 12px;border-radius:var(--r-sm);border-color:var(--line2);box-shadow:0 2px 0 var(--line)}
+a.btn{color:var(--ink)}a.btn:hover{color:var(--acc)}
+.btn:hover{border-color:var(--acc);color:var(--acc);transform:translateY(-1px)}
+.btn:active{transform:translateY(1px);box-shadow:none}
+.btn.pri{background:var(--acc);color:var(--accink);box-shadow:0 2px 0 rgba(0,0,0,.25);font-weight:600}
+.btn.pri:hover{color:var(--accink);filter:brightness(1.12)}
+.btn.s{height:26px;padding:0 9px;font-size:12.5px}
+select{height:var(--h);border-radius:var(--r-sm);border-color:var(--line2);padding:0 8px}
+.seg{padding:3px;gap:2px}
+.seg button{border-radius:999px;padding:5px 14px}
+.seg button.on{box-shadow:0 2px 8px -3px var(--acc)}
+
+/* แท็บ: เส้นใต้ไวน์ */
+#tabs button{padding:8px 14px;font-size:14px}
+#tabs button.on{border-bottom-color:var(--wine)}
+
+/* การ์ด: แถบสีด้านซ้ายเป็นลายเซ็น */
+.card{position:relative;border-radius:var(--r);padding:10px 14px 10px 18px;overflow:hidden;box-shadow:0 1px 2px rgba(40,30,25,.08)}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--acc)}
+.card h2{font-size:16px}
+.note{font-size:12.5px}
+#err{background:#F1DDD4;color:var(--wine)}
+[data-theme=dark] #err{background:#3A2218;color:#F2A184}
+#draftbar{background:#F3E3A8;color:#4F3F00}
+#setnote{background:#DDE3EC;color:#14253F}
+[data-theme=dark] #setnote{background:#1D2A3D;color:#CFE0F5}
+
+/* ชิป / ปุ่มสลับที่ถูกเลือก */
+.mchips button.on,.pager .tabs2 button.on,#gs-mode button.on{box-shadow:0 2px 8px -3px var(--acc)}
+.chip.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,var(--panel))}
+.chip.cEN i{color:var(--wine)}.chip.cLN i{color:var(--acc)}
+.rEN{background:#F1DDD4;color:var(--wine)}.rLN{background:#DDE3EC;color:#14253F}.rN{background:var(--soft);color:var(--mute)}
+[data-theme=dark] .rEN{background:#3A2218;color:#F2A184}[data-theme=dark] .rLN{background:#1D2A3D;color:#CFE0F5}
+.gchip em,.gchip.off,.gwarn{color:#7A5C00}
+[data-theme=dark] .gchip em,[data-theme=dark] .gchip.off,[data-theme=dark] .gwarn{color:#E0B93D}
+
+/* ตาราง */
+.dt thead th{border-bottom:2px solid var(--line2)}
+.dt td.gc{background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.dt thead th.gr{background:color-mix(in srgb,var(--acc) 14%,var(--soft))}
+[data-theme=dark] .dt thead th.gr{background:color-mix(in srgb,var(--acc) 22%,var(--soft))}
+.dt td,.chip2,.figtb td{font-family:var(--mono)}
+.dt td:first-child{font-family:inherit}
+main{padding-top:14px}
+@media(pointer:coarse){:root{--h:40px}}
+
+/* ===== หน้า admin ===== */
+:root{--ok:#1F3A5F;--bad:#6B1F2A;--warn:#7A5C00}
+[data-theme=dark]{--ok:#8FB0DC;--bad:#E08A92;--warn:#E0B93D}
+.tabs button{padding:8px 14px;font-size:14px}
+.tabs button.on{border-bottom-color:var(--wine)}
+.btn.d{border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.info{background:#F3E3A8;color:#4F3F00}
+input,select,textarea{border-color:var(--line2);border-radius:var(--r-sm)}
+input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(--acc) 35%,transparent)}

@@ -170,7 +170,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 22px 30px;font-size:12.5px;color
     <label>เกณฑ์ข้อมูลครบ
       <select id="cov"><option value="0">มีข้อมูลก็แสดง</option><option value="0.5">≥ 50% ของวัน</option><option value="0.75">≥ 75% ของวัน</option><option value="0.9">≥ 90% ของวัน</option></select>
     </label>
-    <a class="btn" href="admin.html">หลังบ้าน</a>
+    <a class="btn" href="admin.html">Admin Panel</a>
   </div>
 </div>
 <div id="gstrip" style="display:none">
@@ -976,7 +976,7 @@ function blOpts(){
     {label:'Mean − SD (≥0)',cell:c=>S[c.id].dn==null?'—':rf(S[c.id].dn),raw:c=>S[c.id].dn},
     {label:'ต่ำสุด',cell:g('min'),raw:raw('min')},{label:'สูงสุด',cell:g('max'),raw:raw('max')}];
   return{corner:'ปี',rows,cell,fmt:fm,shade,foot,S,met,view,
-    extra:[{h:'RONI ('+RSEAN[RSEA]+')',cell:r=>{const x=ron(r.key);return x?'<span class="rchip r'+rcls(x.cat)+'">'+rabbr(r.key)+(rstr(x)?' '+esTxt(rstr(x)):'')+'</span>':'';},csv:r=>rabbr(r.key)},
+    extra:[{h:'RONI ('+RSEAN[RSEA]+')',cell:r=>{const x=ron(r.key);return x?'<span class="rchip r'+rcls(x.cat)+(rstr(x)?' s-'+['','weak','moderate','strong'][rstr(x)]:'')+'">'+rabbr(r.key)+(rstr(x)?' '+esTxt(rstr(x)):'')+'</span>':'';},csv:r=>rabbr(r.key)},
            {h:'ใช้คำนวณ',cell:r=>BL.years.has(r.key)?'✓':'',csv:r=>BL.years.has(r.key)?'1':'0'}],
     rowCls:r=>BL.years.has(r.key)?'inbl':'outbl',
     fname:'pm25_baseline_'+met+'_'+view+'.csv'};

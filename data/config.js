@@ -12,7 +12,8 @@ window.PM25_CFG={
    3,
    4,
    5
-  ]
+  ],
+  "groupStationMode": "all"
  },
  "sets": [
   {
@@ -82,7 +83,8 @@ window.PM25_CFG={
    "location": "ต. ศรีภูมิ อ. เมือง",
    "province": "เชียงใหม่",
    "lat": 18.791,
-   "lon": 98.988
+   "lon": 98.988,
+   "rep": true
   },
   {
    "code": "57t",
@@ -90,7 +92,8 @@ window.PM25_CFG={
    "location": "ต. เวียง อ. เมือง",
    "province": "เชียงราย",
    "lat": 19.912,
-   "lon": 99.832
+   "lon": 99.832,
+   "rep": true
   },
   {
    "code": "73t",
@@ -98,7 +101,8 @@ window.PM25_CFG={
    "location": "ต. เวียงพางคำ อ. แม่สาย",
    "province": "เชียงราย",
    "lat": 20.427,
-   "lon": 99.883
+   "lon": 99.883,
+   "rep": false
   },
   {
    "code": "37t",
@@ -106,7 +110,8 @@ window.PM25_CFG={
    "location": "ต. พระบาท อ. เมือง",
    "province": "ลำปาง",
    "lat": 18.278,
-   "lon": 99.507
+   "lon": 99.507,
+   "rep": true
   },
   {
    "code": "68t",
@@ -114,7 +119,8 @@ window.PM25_CFG={
    "location": "ต. บ้านกลาง อ. เมือง",
    "province": "ลำพูน",
    "lat": 18.059,
-   "lon": 99.057
+   "lon": 99.057,
+   "rep": true
   },
   {
    "code": "58t",
@@ -122,7 +128,8 @@ window.PM25_CFG={
    "location": "ต. จองคำ อ. เมือง",
    "province": "แม่ฮ่องสอน",
    "lat": 19.284,
-   "lon": 97.967
+   "lon": 97.967,
+   "rep": true
   },
   {
    "code": "67t",
@@ -130,7 +137,8 @@ window.PM25_CFG={
    "location": "ต. ในเวียง อ. เมือง",
    "province": "น่าน",
    "lat": 18.782,
-   "lon": 100.786
+   "lon": 100.786,
+   "rep": true
   },
   {
    "code": "75t",
@@ -138,7 +146,8 @@ window.PM25_CFG={
    "location": "ต. ห้วยโก๋น อ. เฉลิมพระเกียรติ",
    "province": "น่าน",
    "lat": 19.575,
-   "lon": 101.082
+   "lon": 101.082,
+   "rep": false
   },
   {
    "code": "70t",
@@ -146,7 +155,8 @@ window.PM25_CFG={
    "location": "ต. บ้านต๋อม อ. เมือง",
    "province": "พะเยา",
    "lat": 19.154,
-   "lon": 99.873
+   "lon": 99.873,
+   "rep": true
   },
   {
    "code": "69t",
@@ -154,7 +164,8 @@ window.PM25_CFG={
    "location": "ต. นาจักร อ. เมือง",
    "province": "แพร่",
    "lat": 18.118,
-   "lon": 100.162
+   "lon": 100.162,
+   "rep": true
   },
   {
    "code": "76t",
@@ -162,7 +173,8 @@ window.PM25_CFG={
    "location": "ต. แม่ปะ อ. แม่สอด",
    "province": "ตาก",
    "lat": 16.74,
-   "lon": 98.605
+   "lon": 98.605,
+   "rep": true
   },
   {
    "code": "CM",
@@ -170,7 +182,8 @@ window.PM25_CFG={
    "location": "อ.เมืองเชียงใหม่",
    "province": "เชียงใหม่",
    "lat": 18.80173,
-   "lon": 98.953406
+   "lon": 98.953406,
+   "rep": true
   },
   {
    "code": "LP",
@@ -178,7 +191,8 @@ window.PM25_CFG={
    "location": "อ.เมืองลำพูน",
    "province": "ลำพูน",
    "lat": 18.58892,
-   "lon": 99.03947
+   "lon": 99.03947,
+   "rep": true
   },
   {
    "code": "LI",
@@ -186,7 +200,8 @@ window.PM25_CFG={
    "location": "อ.ลี้",
    "province": "ลำพูน",
    "lat": 17.80283,
-   "lon": 98.95053
+   "lon": 98.95053,
+   "rep": false
   }
  ],
  "roni": {

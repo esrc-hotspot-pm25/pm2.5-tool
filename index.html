@@ -91,6 +91,32 @@ table.dt{border-collapse:separate;border-spacing:0;font-size:13.5px;font-variant
 .dt thead th.c0{z-index:4}
 .dt .grp.stb{border-left:2px solid var(--pline)}
 .dt td.gc{font-weight:700;background:rgba(15,106,133,.06)}
+.dt th.gr{min-width:158px}
+.dt th.gr small{white-space:normal;max-width:170px;display:block;line-height:1.35;font-weight:400}
+#gstrip{background:var(--panel);border-bottom:1px solid var(--line);border-left:5px solid var(--acc);padding:10px 22px}
+.gs-row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.gs-row .t{font-size:14.5px}
+#gs-mode{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--bg)}
+#gs-mode button{border:0;background:none;padding:5px 14px;cursor:pointer;font-size:13.5px;color:var(--mute)}
+#gs-mode button i{font-style:normal;background:var(--line);color:var(--ink);border-radius:9px;padding:0 7px;margin-left:5px;font-size:11.5px}
+#gs-mode button.on{background:var(--acc);color:var(--accink);font-weight:700}
+#gs-mode button.on i{background:rgba(255,255,255,.28);color:inherit}
+.gs-hint{font-size:12px;color:var(--mute)}
+.gs-sum{display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:8px}
+.gchip{font-size:12.5px;background:var(--soft);border-radius:14px;padding:2px 12px;line-height:1.6}
+.gchip i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}
+.gchip em{font-style:normal;color:#b45309}
+.gchip.off{color:#b45309}
+.gs-panel{display:none;margin-top:10px}
+.gpa{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--mute)}
+.gpg{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:8px}
+.gp{border:1px solid var(--line);border-top:4px solid var(--pc,#888);border-radius:8px;padding:6px 10px 8px;background:var(--bg)}
+.gph{display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.gph b{flex:1}.gph>span{font-size:12px;color:var(--mute)}
+.gst{display:flex;gap:6px;align-items:baseline;font-size:13px;padding:2px 0;cursor:pointer}
+.gst span{color:var(--mute);font-size:12px}
+.gst em{font-style:normal;background:var(--acc);color:var(--accink);border-radius:8px;padding:0 7px;font-size:11px;white-space:nowrap}
+.gwarn{font-size:12px;color:#b45309;margin:2px 0}
 .dt thead th.gr{background:#dbe9ef}[data-theme=dark] .dt thead th.gr{background:#26414e}
 .dt th.sc small,.dt th.pv small{display:block;font-weight:400;font-size:11px;color:var(--mute);line-height:1.25}
 .dt td.stb,.dt th.stb{border-left:2px solid var(--pline)}
@@ -145,6 +171,16 @@ footer{max-width:1440px;margin:0 auto;padding:0 22px 30px;font-size:12.5px;color
     </label>
     <a class="btn s" href="admin.html">หลังบ้าน</a>
   </div>
+</div>
+<div id="gstrip" style="display:none">
+  <div class="gs-row">
+    <b class="t">ค่า "8 / 9 จังหวัด" คำนวณจากสถานีไหน?</b>
+    <div id="gs-mode"></div>
+    <button class="btn s" id="gs-toggle">ปรับสถานี ▾</button>
+    <span class="gs-hint">มีผลกับคอลัมน์ 8 / 9 จังหวัดทุกหน้า · คอลัมน์จังหวัดและสถานียังใช้ทุกสถานีของตัวเอง</span>
+  </div>
+  <div class="gs-sum" id="gs-sum"></div>
+  <div class="gs-panel" id="gs-panel"></div>
 </div>
 <div id="setnote"></div>
 <main>
@@ -316,23 +352,55 @@ function meanSeries(codes,y){
     out.push(a);}
   return any?out:null;
 }
-function groupSeries(g,y){
-  if(GMETHOD==='station')return meanSeries(ST.filter(s=>g.provinces.indexOf(s.province)>=0).map(s=>s.code),y);
-  const arrs=g.provinces.map(p=>SER['P:'+p]&&SER['P:'+p][y]).filter(Boolean);if(!arrs.length)return null;
+/* ---------- สถานีที่ใช้คำนวณกลุ่ม 8 / 9 จังหวัด ---------- */
+const GMODE_DEF=DB.settings.groupStationMode==='rep'?'rep':'all';
+let GSEL={mode:null,custom:null},GPANEL=false;
+try{const t=JSON.parse(localStorage.getItem('pm25_gsel')||'null');if(t&&t.mode)GSEL={mode:t.mode,custom:Array.isArray(t.custom)?t.custom:null};}catch(e){}
+function repCodes(){
+  if(ST.some(s=>s.rep!==undefined))return ST.filter(s=>s.rep===true).map(s=>s.code);
+  const out=[];PROVS.forEach(p=>{const l=ST.filter(s=>s.province===p),c=l.filter(s=>/อ\.\s*เมือง/.test(s.location||''));(c.length?c:l.slice(0,1)).forEach(s=>out.push(s.code));});return out;
+}
+function curMode(){const m=GSEL.mode||GMODE_DEF;return(m==='custom'&&!GSEL.custom)?GMODE_DEF:m;}
+function selCodes(){
+  const m=curMode();let codes;
+  if(m==='rep')codes=repCodes();else if(m==='custom')codes=GSEL.custom.filter(c=>STM[c]);else codes=ST.map(s=>s.code);
+  return new Set(codes);
+}
+const gValid=g=>g.provinces&&g.provinces.length>=2&&g.provinces.every(p=>PROVS.indexOf(p)>=0);
+function groupSeries(e,y){
+  if(GMETHOD==='station')return meanSeries(e.codes,y);
+  const arrs=e.provsEff.map(p=>SER['PS:'+p]&&SER['PS:'+p][y]).filter(Boolean);if(!arrs.length)return null;
   const out=[];let any=false;
   for(let m=0;m<12;m++){const n=dim(y,m+1),a=new Array(n).fill(null);
     for(let d=0;d<n;d++){let s=0,c=0;arrs.forEach(x=>{const v=x[m][d];if(v!=null){s+=v;c++;}});if(c){a[d]=s/c;any=true;}}
     out.push(a);}
   return any?out:null;
 }
-const groupNote=g=>'กลุ่ม "'+g.label+'" = '+(GMETHOD==='station'?'เฉลี่ยของสถานีในจังหวัด: ':'เฉลี่ยของจังหวัด (น้ำหนักเท่ากัน): ')+g.provs.join(', ')+' · แสดงเมื่ออย่างน้อย 80% ของจังหวัดในกลุ่มมีข้อมูลผ่านเกณฑ์';
+function buildGroups(){
+  const S=selCodes();
+  ENT=ENT.filter(e=>e.type!=='gr');Object.keys(ENTM).forEach(k=>{if(k.indexOf('G:')===0)delete ENTM[k];});
+  PROVS.forEach(p=>{
+    const all=ST.filter(s=>s.province===p).map(s=>s.code),sel=all.filter(c=>S.has(c));
+    if(!sel.length){delete SER['PS:'+p];return;}
+    if(sel.length===all.length){SER['PS:'+p]=SER['P:'+p];return;}
+    const o={};YEARS.forEach(y=>{const r=meanSeries(sel,y);if(r)o[y]=r;});SER['PS:'+p]=o;
+  });
+  GR=[];const ents=[];
+  GDEFS.forEach(g=>{
+    if(!gValid(g))return;
+    const eff=g.provinces.filter(p=>SER['PS:'+p]);if(eff.length<2)return;
+    GR.push(g);
+    ents.push({id:'G:'+g.id,label:g.label,type:'gr',sub:'กลุ่มจังหวัด',gid:g.id,provs:g.provinces.slice(),provsEff:eff,missing:g.provinces.filter(p=>eff.indexOf(p)<0),codes:ST.filter(s=>eff.indexOf(s.province)>=0&&S.has(s.code)).map(s=>s.code),excl:PROVS.filter(p=>g.provinces.indexOf(p)<0),color:g.color||'#222222'});
+  });
+  ENT=ents.concat(ENT);ents.forEach(e=>{ENTM[e.id]=e;const o={};YEARS.forEach(y=>{const r=groupSeries(e,y);if(r)o[y]=r;});SER[e.id]=o;});
+}
+const groupNote=e=>'กลุ่ม "'+e.label+'" = '+(GMETHOD==='station'?'เฉลี่ยของสถานีที่เลือก':'เฉลี่ยของจังหวัด (น้ำหนักเท่ากัน)')+' · จังหวัด ('+e.provsEff.length+'): '+e.provsEff.join(', ')+' · สถานี ('+e.codes.length+'): '+e.codes.join(', ')+' · แสดงเมื่ออย่างน้อย 80% ของจังหวัดมีข้อมูลผ่านเกณฑ์';
+const groupStationsTxt=()=>ENT.filter(e=>e.type==='gr').map(e=>e.label+' ใช้ '+e.codes.length+' สถานี ('+e.codes.join(', ')+')').join(' · ');
 function loadSet(id){
   DS=SETS.find(s=>s.id===id)||SETS[0];
   ST=DB.stations.filter(s=>(s.set||'k11')===DS.id);STM={};ST.forEach(s=>STM[s.code]=s);
   PROVS=[];ST.forEach(s=>{if(PROVS.indexOf(s.province)<0)PROVS.push(s.province);});
   ENT=[];
-  GR=GDEFS.filter(g=>g.provinces&&g.provinces.length>=2&&g.provinces.every(p=>PROVS.indexOf(p)>=0));
-  GR.forEach(g=>ENT.push({id:'G:'+g.id,label:g.label,type:'gr',sub:'กลุ่มจังหวัด',gid:g.id,provs:g.provinces.slice(),codes:ST.filter(s=>g.provinces.indexOf(s.province)>=0).map(s=>s.code),excl:PROVS.filter(p=>g.provinces.indexOf(p)<0),color:g.color||'#222222'}));
   PROVS.forEach(p=>ENT.push({id:'P:'+p,label:p,type:'pv',sub:'จังหวัด',codes:ST.filter(s=>s.province===p).map(s=>s.code),color:provColor(p)}));
   ST.forEach(s=>ENT.push({id:'S:'+s.code,label:s.code,type:'st',sub:s.province,st:s,color:provColor(s.province)}));
   ENTM={ALL:{id:'ALL',label:'ภาพรวมทุกสถานี',type:'all'}};ENT.forEach(e=>ENTM[e.id]=e);
@@ -341,7 +409,7 @@ function loadSet(id){
   ST.forEach(s=>{const o={};YEARS.forEach(y=>{const r=meanSeries([s.code],y);if(r)o[y]=r;});SER['S:'+s.code]=o;});
   PROVS.forEach(p=>{const codes=ST.filter(s=>s.province===p).map(s=>s.code),o={};YEARS.forEach(y=>{const r=meanSeries(codes,y);if(r)o[y]=r;});SER['P:'+p]=o;});
   {const codes=ST.map(s=>s.code),o={};YEARS.forEach(y=>{const r=meanSeries(codes,y);if(r)o[y]=r;});SER.ALL=o;}
-  GR.forEach(g=>{const o={};YEARS.forEach(y=>{const r=groupSeries(g,y);if(r)o[y]=r;});SER['G:'+g.id]=o;});
+  buildGroups();
   CACHE.clear();
 }
 
@@ -360,7 +428,7 @@ function stat(id,y,ms){ // ms: null = ทั้งปี | เลข 0-11 | อ�
 const okStat=r=>r.n>0&&r.n>=MINCOV*r.dim;
 function val(id,y,ms,met){
   if(id==='ALL'){let ok=0;ST.forEach(s=>{if(okStat(stat('S:'+s.code,y,ms)))ok++;});if(ok<Math.ceil(ST.length*0.8))return null;}
-  if(id.charAt(0)==='G'&&id.charAt(1)===':'){const g=ENTM[id];if(g&&g.provs){let ok=0;g.provs.forEach(p=>{if(okStat(stat('P:'+p,y,ms)))ok++;});if(ok<Math.ceil(g.provs.length*0.8))return null;}}
+  if(id.charAt(0)==='G'&&id.charAt(1)===':'){const g=ENTM[id];if(g&&g.provsEff){let ok=0;g.provsEff.forEach(p=>{if(okStat(stat('PS:'+p,y,ms)))ok++;});if(ok<Math.ceil(g.provsEff.length*0.8))return null;}}
   const r=stat(id,y,ms);return okStat(r)?r[met]:null;
 }
 const isDec=met=>met==='avg'||met==='max';
@@ -428,7 +496,7 @@ function tbl(o){
   if(NG)h+='<th colspan="'+NG+'" class="grp">ภาพรวม</th>';
   h+='<th colspan="'+NP+'" class="grp'+(NG?' stb':'')+'">จังหวัด (สถานีที่ใช้คำนวณอยู่ใต้ชื่อ)</th><th colspan="'+NS+'" class="grp stb">สถานี</th></tr><tr>';
   ENT.forEach((e,i)=>{const b=bd(i)?' stb':'';
-    if(e.type==='gr')h+='<th class="gr'+b+'" style="--pc:'+e.color+'">'+esc(e.label)+'<small>'+(e.excl.length?'ไม่รวม'+esc(e.excl.join(', ')):'ทุกจังหวัด')+'</small></th>';
+    if(e.type==='gr')h+='<th class="gr'+b+'" style="--pc:'+e.color+'">'+esc(e.label)+'<small>'+(e.excl.length?'ไม่รวม'+esc(e.excl.join(', ')):'ทุกจังหวัด')+(e.missing.length?' · ไม่มีสถานี: '+esc(e.missing.join(', ')):'')+'<br>สถานี: '+esc(e.codes.join(', '))+'</small></th>';
     else if(e.type==='pv')h+='<th class="pv'+b+'" style="--pc:'+e.color+'">'+esc(e.label)+'<small>'+esc(e.codes.join(', '))+'</small></th>';
     else h+='<th class="sc'+b+'" style="--pc:'+e.color+'" title="'+esc(e.st.location)+'">'+esc(e.label)+'<small>'+esc(e.sub)+'</small></th>';});
   h+='</tr></thead><tbody>';
@@ -442,7 +510,7 @@ function tbl(o){
   if(o.foot&&o.foot.length){h+='<tfoot>';o.foot.forEach(f=>{h+='<tr><th class="c0">'+esc(f.label)+'</th>';(o.extra||[]).forEach(()=>h+='<td></td>');ENT.forEach((c,i)=>h+='<td class="'+(bd(i)?'stb':'')+'">'+f.cell(c)+'</td>');h+='</tr>';});h+='</tfoot>';}
   return h+'</table></div>';
 }
-const colHead=()=>ENT.map(c=>c.type==='gr'?c.label+(c.excl.length?' (ไม่รวม'+c.excl.join(', ')+')':'')+' ['+(GMETHOD==='station'?'เฉลี่ยสถานี':'เฉลี่ยจังหวัด')+']':c.type==='pv'?'จ.'+c.label+' ('+c.codes.join('+')+')':c.label+' ('+c.sub+')');
+const colHead=()=>ENT.map(c=>c.type==='gr'?c.label+(c.excl.length?' (ไม่รวม'+c.excl.join(', ')+')':'')+' ['+(GMETHOD==='station'?'เฉลี่ยสถานี':'เฉลี่ยจังหวัด')+'; สถานี: '+c.codes.join('+')+']':c.type==='pv'?'จ.'+c.label+' ('+c.codes.join('+')+')':c.label+' ('+c.sub+')');
 function tblCSV(o,name){
   if(o.csv){dlCSV(o.csv(),name);return;}
   const rows=[[o.corner].concat((o.extra||[]).map(e=>e.h),colHead())];
@@ -655,7 +723,7 @@ function figFromOpts(key,boxId,o,level){
   const sers=[];
   const pv=ENT.filter(e=>e.type==='pv'),stn=ENT.filter(e=>e.type==='st');
   const lv=level||'pv';
-  if(lv==='gr')ENT.filter(e=>e.type==='gr').forEach((e,i)=>sers.push({label:e.label+(e.excl.length?' (ไม่รวม'+e.excl.join(', ')+')':''),color:e.color,thick:1,vals:o.rows.map(r=>o.cell(r,e)),shape:i%4}));
+  if(lv==='gr')ENT.filter(e=>e.type==='gr').forEach((e,i)=>sers.push({label:e.label+(e.excl.length?' (ไม่รวม'+e.excl.join(', ')+')':'')+' · '+e.codes.length+' สถานี',color:e.color,thick:1,vals:o.rows.map(r=>o.cell(r,e)),shape:i%4}));
   if(lv==='pv'||lv==='both')pv.forEach((e,i)=>sers.push({label:'จ.'+e.label,color:e.color,vals:o.rows.map(r=>o.cell(r,e)),shape:i%4}));
   if(lv==='st'||lv==='both'){
     const cnt={};
@@ -765,6 +833,12 @@ function renderMap(){
     +'<span><i style="background:none;border:1.5px dashed var(--mute)"></i>ไม่มีข้อมูล/ไม่ถึงเกณฑ์</span>';
   const chip=v=>v==null?'<span class="chip2" style="color:var(--mute)">—</span>':'<span class="chip2" style="background:'+(cnt?seq(v/c.dm):PMC[pmCat(v)])+';color:'+txtOf(v)+'">'+fmt(v,c.met)+'</span>';
   let sh='<h2 style="margin:0 0 2px;font-size:16px">'+esc(perLabel(c))+'</h2><div class="note" style="margin:0">'+esc(c.mode==='day'?'PM2.5 รายวัน (µg/m³)':METN[c.met])+'</div>';
+  ENT.filter(e=>e.type==='gr').forEach((e,i)=>{
+    if(i===0)sh+='<div class="ph" style="--pc:#555"><span>ภาพรวมกลุ่มจังหวัด<small>ใช้สถานีตามแถบเลือกด้านบน</small></span></div>';
+    let v=null;
+    if(c.mode==='day'){const sr=SER[e.id]&&SER[e.id][c.y],x=sr&&sr[c.md]?sr[c.md][c.d]:null;v=x==null?null:x;}else v=val(e.id,c.y,c.ms,c.met);
+    sh+='<div class="sr" style="cursor:default"><span><b>'+esc(e.label)+'</b><small>'+e.codes.length+' สถานี: '+esc(e.codes.join(', '))+'</small></span>'+chip(v)+'</div>';
+  });
   PROVS.forEach(p=>{
     const pr=pval('P:'+p,c),codes=ST.filter(s=>s.province===p).map(s=>s.code);
     sh+='<div class="ph" style="--pc:'+provColor(p)+'"><span>จ.'+esc(p)+'<small>สถานี: '+esc(codes.join(', '))+'</small></span>'+chip(pr.v)+'</div>';
@@ -807,7 +881,7 @@ function periodOpts(p){
       xtitle:'วันที่',std:dt==='val',ylabel:dt==='val'?base.ylabel:(dt==='th'?'เกินมาตรฐานไทย (1 = เกิน)':'เกิน WHO (1 = เกิน)'),
       fname:'pm25_daily_'+y+'_'+dt+'.csv'});
     o.pager={months:sel,cur:PGI};
-    if(GR.length)o.note+=' · คอลัมน์กลุ่มจังหวัด = ค่าเฉลี่ยของจังหวัดที่มีข้อมูลในวันนั้น';
+    if(ENT.some(e=>e.type==='gr'))o.note+=' · คอลัมน์กลุ่มจังหวัด = ค่าเฉลี่ยของจังหวัดที่มีข้อมูลในวันนั้น ('+groupStationsTxt()+')';
     o.csv=()=>{const rows2=[['วันที่'].concat(colHead())];sel.forEach(m=>{for(let d=0;d<dim(y,m+1);d++){rows2.push([y+'-'+String(m+1).padStart(2,'0')+'-'+String(d+1).padStart(2,'0')].concat(ENT.map(c=>{const v=pick(dv(c,m,d));return v==null?'':(dt==='val'?+v.toFixed(2):v);})));}});return rows2;};
     o.name='pm25_daily_'+y+'_'+monthsLabel(sel).replace(/[^\w\u0E00-\u0E7F\-]+/g,'_');
     o.figNotes=['แหล่งข้อมูล: '+DS.source,'ค่ารายจังหวัด = เฉลี่ยของสถานีในจังหวัดนั้นในวันเดียวกัน'];
@@ -838,7 +912,7 @@ function periodOpts(p){
   }
   let mx=1;o.rows.forEach(r=>ENT.forEach(c=>{const v=o.cell(r,c);if(v!=null&&v>mx)mx=v;}));
   o.fmt=v=>fmt(v,met);o.shade=isC?shadePM:shadeCnt(mx);o.std=isC&&isDec(met);
-  if(GR.length)o.note+=' · คอลัมน์ "'+GR.map(g=>g.label).join('" และ "')+'" = '+(GMETHOD==='station'?'ค่าเฉลี่ยของสถานีทั้งหมดในกลุ่ม':'ค่าเฉลี่ยของจังหวัดในกลุ่ม (ทุกจังหวัดน้ำหนักเท่ากัน)')+' แสดงเมื่ออย่างน้อย 80% ของจังหวัดในกลุ่มมีข้อมูลผ่านเกณฑ์';
+  if(ENT.some(e=>e.type==='gr'))o.note+=' · '+groupStationsTxt()+' · ค่ากลุ่ม = '+(GMETHOD==='station'?'เฉลี่ยของสถานีที่เลือก':'เฉลี่ยของจังหวัด (น้ำหนักเท่ากัน)')+' แสดงเมื่ออย่างน้อย 80% ของจังหวัดที่มีสถานีถูกเลือกมีข้อมูลผ่านเกณฑ์ · เปลี่ยนสถานีได้ที่แถบด้านบน';
   if(DS.sampled)o.note+=' · ชุดข้อมูลนี้เก็บตัวอย่างไม่ครบทุกวัน ค่าที่แสดงคำนวณจากวันที่มีตัวอย่างเท่านั้น';
   o.name=o.fname.replace(/\.csv$/,'');
   o.figNotes=['แหล่งข้อมูล: '+DS.source,'ค่ารายจังหวัด = เฉลี่ยของสถานีในจังหวัดนั้นในแต่ละวัน','เกณฑ์ข้อมูลครบ: '+covNote];
@@ -910,7 +984,7 @@ function renderBl(){
    +'3) Mean = Σx / n · SD = √[ Σ(x − Mean)² / (n − 1) ] (SD ตัวอย่าง ต้องมี n ≥ 2) · Mean ± SD ใช้เป็นช่วงปกติ (Mean − SD ไม่ต่ำกว่า 0)<br>'
    +'4) ในตาราง: แถวสีเหลืองคือปีที่ใช้คำนวณ · ตัวเลขสีแดง = สูงกว่า Mean + SD · สีเขียว = ต่ำกว่า Mean − SD';
   $('b-table').innerHTML=tbl(blO);
-  $('b-note').textContent='ค่ารายจังหวัดคำนวณจากค่าเฉลี่ยรายวันของสถานีในจังหวัดก่อน แล้วจึงหาค่ารายปี · สถานีที่เริ่มเก็บข้อมูลภายหลังจะมี n น้อยกว่า'+(GR.length?' · '+ENT.filter(e=>e.type==='gr').map(groupNote).join(' · '):'');
+  $('b-note').textContent='ค่ารายจังหวัดคำนวณจากค่าเฉลี่ยรายวันของสถานีในจังหวัดก่อน แล้วจึงหาค่ารายปี · สถานีที่เริ่มเก็บข้อมูลภายหลังจะมี n น้อยกว่า'+(ENT.some(e=>e.type==='gr')?' · '+ENT.filter(e=>e.type==='gr').map(groupNote).join(' · '):'');
 }
 
 /* =========================================================
@@ -957,13 +1031,13 @@ function chartCat(o){
   const st=sty(),W=960,L=74,R=40,ch=330,B=70,key='t',met=o.met,xm=o.xm;
   const list=xm==='prov'?ENT.filter(e=>e.type==='gr'||e.type==='pv'):ENT.filter(e=>e.type==='st');
   const pts=list.map(e=>({e,lab:e.label,sub:xm==='st'?e.sub:'',v:val(e.id,o.yr,o.ms,met),bl:o.noBL?{n:0}:blStats(e.id,met)}));
-  const title=METN[met]+' — ปี '+o.yr+' แยกตาม'+(xm==='prov'?'จังหวัด'+(GR.length?' (รวมกลุ่ม '+GR.map(g=>g.label).join(' / ')+')':''):'สถานี');
+  const title=METN[met]+' — ปี '+o.yr+' แยกตาม'+(xm==='prov'?'จังหวัด'+(ENT.some(e=>e.type==='gr')?' (รวมกลุ่ม '+ENT.filter(e=>e.type==='gr').map(g=>g.label).join(' / ')+')':''):'สถานี');
   const sub='Baseline: '+blLabel()+(o.noBL?'':' · ปีที่เลือก '+[...BL.years].sort((a,b)=>a-b).join(', '))+(o.ms?' · เดือน '+monthsLabel(o.ms):'');
   const items=[{k:'box',c:st.bar,t:'ค่าจริงปี '+o.yr+' (สีแท่งตามจังหวัด)'},{k:'box',c:st.barUp,t:'สูงกว่า Mean+SD'},{k:'box',c:st.barDn,t:'ต่ำกว่า Mean−SD'}];
   if(o.showMean)items.push({k:'dot',shape:3,c:'#fff',stroke:st.base,t:'Baseline Mean'+(o.showSD?' ± SD':'')});
   if(o.showStd)items.push({k:'line',c:st.thc,d:'6 4',t:'มาตรฐานไทย '+TH},{k:'line',c:st.whoc,d:'6 4',t:'WHO '+WHO});
   const notes=['แหล่งข้อมูล: '+DS.source,'SD = ส่วนเบี่ยงเบนมาตรฐานตัวอย่าง (n−1)','แต่ละพื้นที่ใช้เฉพาะปีที่'+covTxt()];
-  if(xm==='prov'&&GR.length)GR.forEach(g=>notes.push(groupNote(ENTM['G:'+g.id])));
+  if(xm==='prov')ENT.filter(e=>e.type==='gr').forEach(e=>notes.push(groupNote(e)));
   const f=frame(st,{W,L,R,B,ch,title,sub,items,notes});
   let max=Math.max(0,...pts.map(p=>p.v==null?0:p.v));
   pts.forEach(p=>{if(p.bl.n){if(o.showMean)max=Math.max(max,p.bl.mean);if(o.showSD&&p.bl.up!=null)max=Math.max(max,p.bl.up);}});
@@ -1021,17 +1095,45 @@ function buildTabs(){
 const fill=(sel,items,cur)=>{sel.innerHTML=items.map(i=>'<option value="'+esc(i[0])+'">'+esc(i[1])+'</option>').join('');if(cur!=null)sel.value=String(cur);};
 const yearItems=()=>YEARS.map(y=>[y,y]);
 const monthItems=()=>MF.map((m,i)=>[i+1,m]);
+function syncGroupUI(){
+  const has=ENT.some(e=>e.type==='gr');
+  [['t-lvl','grp'],['c-fl','gr'],['e-fl','gr']].forEach(a=>{const sel=$(a[0]);[...sel.options].forEach(o=>{if(o.value===a[1]){o.hidden=!has;o.disabled=!has;}});
+    if(!has&&sel.value===a[1])sel.value=a[1]==='grp'?'all':'pv';});
+  fillEnt();
+}
+function renderStrip(){
+  const defsOK=GDEFS.some(gValid);$('gstrip').style.display=defsOK?'block':'none';if(!defsOK)return;
+  const S=selCodes(),mode=curMode(),rc=repCodes();
+  const cnt={all:ST.length,rep:rc.length,custom:GSEL.custom?GSEL.custom.filter(c=>STM[c]).length:null};
+  $('gs-mode').innerHTML=[['all','ทุกสถานีของจังหวัด'],['rep','ในเมืองเป็นตัวแทนจังหวัด'],['custom','เลือกเอง']].map(a=>'<button data-gm="'+a[0]+'" class="'+(mode===a[0]?'on':'')+'">'+a[1]+(cnt[a[0]]!=null?'<i>'+cnt[a[0]]+'</i>':'')+'</button>').join('');
+  const ents=ENT.filter(e=>e.type==='gr');
+  $('gs-sum').innerHTML=GDEFS.filter(gValid).map(g=>{const e=ents.find(x=>x.gid===g.id);
+    return e?'<span class="gchip"><i style="background:'+esc(e.color)+'"></i><b>'+esc(e.label)+'</b> ใช้ '+e.codes.length+' สถานี: '+esc(e.codes.join(' · '))+(e.missing.length?' <em>(ไม่มีสถานีของ: '+esc(e.missing.join(', '))+')</em>':'')+'</span>'
+      :'<span class="gchip off"><b>'+esc(g.label)+'</b> ไม่แสดง — ต้องมีอย่างน้อย 2 จังหวัดที่มีสถานีถูกเลือก</span>';}).join('');
+  $('gs-toggle').textContent=GPANEL?'ซ่อนรายการสถานี ▴':'ปรับสถานี ▾';
+  $('gs-panel').style.display=GPANEL?'block':'none';
+  if(GPANEL){
+    $('gs-panel').innerHTML='<div class="gpa"><b>เลือกสถานีที่นำมาคำนวณ:</b><button class="btn s" data-ga="all">ทุกสถานี</button><button class="btn s" data-ga="rep">เฉพาะตัวแทนจังหวัด</button><button class="btn s" data-ga="none">ล้างทั้งหมด</button><span>เช่น ตัดสถานีชายแดน หรือให้สถานีในเมืองเป็นตัวแทนจังหวัดเพียงสถานีเดียว</span></div><div class="gpg">'
+      +PROVS.map(p=>{const l=ST.filter(s=>s.province===p),n=l.filter(s=>S.has(s.code)).length;
+        return'<div class="gp" style="--pc:'+provColor(p)+'"><div class="gph"><b>จ.'+esc(p)+'</b><span>เลือก '+n+'/'+l.length+'</span><button class="btn s" data-gp="all" data-prov="'+esc(p)+'">ทั้งหมด</button><button class="btn s" data-gp="none" data-prov="'+esc(p)+'">ล้าง</button></div>'
+          +(n===0?'<div class="gwarn">ไม่มีสถานีถูกเลือก — จังหวัดนี้จะไม่ถูกนับในกลุ่ม</div>':'')
+          +l.map(s=>'<label class="gst"><input type="checkbox" data-gc="'+esc(s.code)+'"'+(S.has(s.code)?' checked':'')+'> <b>'+esc(s.code)+'</b> <span>'+esc(s.location||'')+'</span>'+(rc.indexOf(s.code)>=0?' <em>ตัวแทนจังหวัด</em>':'')+'</label>').join('')+'</div>';}).join('')+'</div>';
+  }
+}
+function applyGsel(){
+  try{localStorage.setItem('pm25_gsel',JSON.stringify({mode:GSEL.mode,custom:GSEL.custom}));}catch(e){}
+  buildGroups();CACHE.clear();syncGroupUI();renderStrip();refresh();
+}
 function fillEnt(){
   const lv=$('t-lvl').value;
   $('t-ent').innerHTML=lv==='all'?'<option value="ALL">ภาพรวมทุกสถานี (เฉลี่ยทุกสถานี)</option>'
-    :lv==='grp'?GR.map(g=>'<option value="G:'+esc(g.id)+'">'+esc(g.label)+(g.provinces.length<PROVS.length?' (ไม่รวม '+esc(PROVS.filter(p=>g.provinces.indexOf(p)<0).join(', '))+')':' (ทุกจังหวัด)')+'</option>').join('')
+    :lv==='grp'?ENT.filter(e=>e.type==='gr').map(e=>'<option value="'+esc(e.id)+'">'+esc(e.label)+(e.excl.length?' (ไม่รวม '+esc(e.excl.join(', '))+')':' (ทุกจังหวัด)')+' · '+e.codes.length+' สถานี</option>').join('')
     :lv==='prov'?PROVS.map(p=>'<option value="P:'+esc(p)+'">จ.'+esc(p)+' (สถานี: '+esc(ST.filter(s=>s.province===p).map(s=>s.code).join(', '))+')</option>').join('')
     :ST.map(s=>'<option value="S:'+esc(s.code)+'">'+esc(s.code)+' — '+esc(s.province)+'</option>').join('');
 }
 function fillControls(){
   const last=Y1;
   fill($('m-sea'),seasonItems(),'all');fill($('c-sea'),seasonItems(),'all');fill($('e-sea'),seasonItems(),'all');
-  [['t-lvl','grp'],['c-fl','gr'],['e-fl','gr']].forEach(a=>{[...$(a[0]).options].forEach(o=>{if(o.value===a[1]){o.hidden=!GR.length;o.disabled=!GR.length;}});});
   fill($('m-y'),yearItems(),last);fill($('m-m'),monthItems(),(dataMonths(last)[0]||2)+1);
   fill($('m-d'),[[1,1]],1);syncMapDays();
   fill($('m-met'),Object.keys(METS).map(k=>[k,METS[k]]),'avg');
@@ -1051,7 +1153,7 @@ function switchSet(id,pg){
   document.querySelectorAll('#setseg button').forEach(b=>b.classList.toggle('on',b.dataset.set===DS.id));
   BL.years=new Set();applyPreset('p2019');
   MINCOV=+DS.minCoverage;const opt=[...$('cov').options].find(o=>+o.value===MINCOV);if(opt)$('cov').value=opt.value;else{$('cov').insertAdjacentHTML('beforeend','<option value="'+MINCOV+'">≥ '+Math.round(MINCOV*100)+'%</option>');$('cov').value=String(MINCOV);}
-  fillControls();resetMonths();renderPickers();buildTabs();
+  fillControls();syncGroupUI();resetMonths();renderPickers();buildTabs();renderStrip();
   $('ttl').textContent=(DB.meta.title||'PM2.5')+' — ชุดข้อมูล '+DS.label+' ('+DS.sub+')';
   $('sub').textContent='ข้อมูลรายวัน '+(Y0===Y1?Y0:Y0+'–'+Y1)+' · '+ST.length+' สถานี · '+PROVS.length+' จังหวัด · ปรับปรุงล่าสุด '+(DB.meta.updated||'-')+(DS.source?' · '+DS.source:'');
   const sn=$('setnote');sn.style.display=DS.note?'block':'none';sn.textContent=DS.note||'';
@@ -1061,6 +1163,14 @@ function switchSet(id,pg){
 $('setseg').innerHTML=SETS.map(s=>'<button data-set="'+esc(s.id)+'">'+esc(s.label)+'<small>'+esc(s.sub)+'</small></button>').join('');
 document.querySelectorAll('#setseg button').forEach(b=>b.addEventListener('click',()=>{if(DS.id!==b.dataset.set)switchSet(b.dataset.set,CUR);}));
 document.querySelectorAll('.figtb').forEach(el=>el.innerHTML=toolbarHTML(el.dataset.key));syncTb();
+$('gstrip').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.id==='gs-toggle'){GPANEL=!GPANEL;renderStrip();return;}
+  if(b.dataset.gm){const m=b.dataset.gm;if(m==='custom'&&!GSEL.custom)GSEL.custom=[...selCodes()];GSEL.mode=m;if(m==='custom')GPANEL=true;applyGsel();return;}
+  if(b.dataset.ga){const a=b.dataset.ga;GSEL.custom=a==='all'?ST.map(s=>s.code):a==='rep'?repCodes():[];GSEL.mode='custom';applyGsel();return;}
+  if(b.dataset.gp){const cur=new Set(selCodes());ST.filter(s=>s.province===b.dataset.prov).forEach(s=>{b.dataset.gp==='all'?cur.add(s.code):cur.delete(s.code);});GSEL.custom=[...cur];GSEL.mode='custom';applyGsel();}
+});
+$('gstrip').addEventListener('change',e=>{const c=e.target.dataset.gc;if(!c)return;const cur=new Set(selCodes());e.target.checked?cur.add(c):cur.delete(c);GSEL.custom=[...cur];GSEL.mode='custom';applyGsel();});
 
 ['m-mode','m-y','m-m','m-d','m-sea','m-met','m-view','m-pfill','m-ctry','m-amp','m-an','m-plb'].forEach(id=>$(id).addEventListener('change',()=>{
   if(id==='m-y'||id==='m-m')syncMapDays();if(id==='m-view')$('m-an').checked=$('m-view').value==='zoom';renderMap();}));

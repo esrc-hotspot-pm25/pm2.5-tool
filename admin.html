@@ -78,7 +78,7 @@ pre.log{background:var(--soft);padding:10px;border-radius:8px;white-space:pre-wr
 <section id="pg-st" class="pg">
   <div class="card">
     <h2>สถานีและพิกัด</h2>
-    <p class="note">แต่ละสถานีต้องเลือก <b>ชุดข้อมูล</b> (เช่น 11 สถานี หรือ 3 สถานี) · ลำดับในตารางนี้ = ลำดับคอลัมน์สถานีในตารางของหน้าบ้านภายในชุดเดียวกัน (จังหวัดเรียงตามสถานีแรกของแต่ละจังหวัด) · พิกัดเป็นองศาทศนิยม (WGS84) · จังหวัดที่ไม่มีใน shapefile 9 จังหวัดจะไม่มีขอบเขตบนแผนที่ แต่ยังแสดงในตารางได้</p>
+    <p class="note">แต่ละสถานีต้องเลือก <b>ชุดข้อมูล</b> (เช่น 11 สถานี หรือ 3 สถานี) · ลำดับในตารางนี้ = ลำดับคอลัมน์สถานีในตารางของหน้าบ้านภายในชุดเดียวกัน (จังหวัดเรียงตามสถานีแรกของแต่ละจังหวัด) · พิกัดเป็นองศาทศนิยม (WGS84) · ช่อง <b>ตัวแทนจังหวัด</b> = สถานีที่ใช้คำนวณค่า 8 / 9 จังหวัดในโหมด "ในเมืองเป็นตัวแทนจังหวัด" ของหน้าเว็บ (ติ๊กได้มากกว่า 1 สถานีต่อจังหวัด เช่น ติ๊กเฉพาะสถานีในเมือง ไม่ติ๊กสถานีชายแดน) · จังหวัดที่ไม่มีใน shapefile 9 จังหวัดจะไม่มีขอบเขตบนแผนที่ แต่ยังแสดงในตารางได้</p>
     <div class="bar"><button class="btn pri" id="st-add">+ เพิ่มสถานี</button></div>
     <div class="wrap"><table class="t" id="st-table"></table></div>
     <datalist id="provlist"></datalist>
@@ -163,6 +163,7 @@ pre.log{background:var(--soft);padding:10px;border-radius:8px;white-space:pre-wr
     <p class="note">แต่ละกลุ่มแสดงเป็นคอลัมน์ในตารางความเข้มข้น วันที่เกินมาตรฐาน และ Baseline (อยู่ซ้ายสุด ก่อนคอลัมน์จังหวัด) · ค่าเริ่มต้น: <b>8 จังหวัด</b> = 9 จังหวัดไม่รวมตาก, <b>9 จังหวัด</b> = ทั้งหมด · กลุ่มจะแสดงในชุดข้อมูลที่มี<b>ครบทุกจังหวัดของกลุ่ม</b>เท่านั้น (เช่น ชุด 3 สถานีไม่แสดง) และต้องมีอย่างน้อย 2 จังหวัด · ค่ากลุ่มของปี/เดือนจะแสดงเมื่ออย่างน้อย 80% ของจังหวัดในกลุ่มมีข้อมูลผ่านเกณฑ์</p>
     <div id="grp-box"></div>
     <div class="bar"><button class="btn" id="grp-add">+ เพิ่มกลุ่มจังหวัด</button>
+      <label>สถานีที่ใช้คำนวณกลุ่มเมื่อเปิดเว็บ <select id="s-gsm"><option value="all">ทุกสถานีของจังหวัด (ค่าเริ่มต้น)</option><option value="rep">เฉพาะสถานีตัวแทนจังหวัด (ติ๊กที่แท็บสถานีและพิกัด)</option></select></label>
       <label>วิธีคำนวณค่ากลุ่ม <select id="s-gm"><option value="province">เฉลี่ยของจังหวัด (ทุกจังหวัดน้ำหนักเท่ากัน)</option><option value="station">เฉลี่ยของสถานีทั้งหมดในกลุ่ม</option></select></label></div>
   </div>
   <div class="card">
@@ -229,13 +230,17 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 let DB,SRC,saveT=null,published=true;
 function normalize(){
   DB.meta=DB.meta||{};
-  DB.settings=Object.assign({th:37.5,who:15,groupMethod:'province',smokeMonths:[2,3,4,5]},DB.settings||{});
+  DB.settings=Object.assign({th:37.5,who:15,groupMethod:'province',smokeMonths:[2,3,4,5],groupStationMode:'all'},DB.settings||{});
   if(!Array.isArray(DB.groups)||!DB.groups.length){const g8=['เชียงใหม่','เชียงราย','ลำปาง','ลำพูน','แม่ฮ่องสอน','น่าน','พะเยา','แพร่'];DB.groups=[{id:'g8',label:'8 จังหวัด',provinces:g8.slice(),color:'#222222'},{id:'g9',label:'9 จังหวัด',provinces:g8.concat(['ตาก']),color:'#B2182B'}];}
   DB.stations=DB.stations||[];DB.daily=DB.daily||{};DB.roni=DB.roni||{};
   if(!Array.isArray(DB.sets)||!DB.sets.length){  // ย้ายข้อมูลจากโครงสร้างเวอร์ชันเก่า
     DB.sets=[{id:'k11',label:'11 สถานี',sub:'กรมควบคุมมลพิษ',years:(DB.meta.years||[2012,2025]).slice(),minCoverage:(DB.settings.minCoverage!=null?DB.settings.minCoverage:0.75),sampled:false,source:DB.meta.source||'',note:''}];
   }
   DB.stations.forEach(s=>{if(!s.set)s.set=DB.sets[0].id;});
+  if(DB.stations.length&&DB.stations.every(s=>s.rep===undefined)){  // ไฟล์เก่าที่ยังไม่มีธงตัวแทนจังหวัด: ตั้งค่าเริ่มต้นให้
+    const by={};DB.stations.forEach(s=>{(by[s.set+'|'+s.province]=by[s.set+'|'+s.province]||[]).push(s);});
+    Object.keys(by).forEach(k=>{const l=by[k],c=l.filter(s=>/อ\.\s*เมือง/.test(s.location||'')),r=c.length?c:l.slice(0,1);l.forEach(s=>{s.rep=r.indexOf(s)>=0;});});
+  }
   Object.keys(DB.roni).forEach(y=>{const r=DB.roni[y];if(r&&r.v!=null&&!r.smoke)DB.roni[y]={smoke:{v:r.v,type:r.type,cat:r.cat}};});
 }
 const setOf=id=>DB.sets.find(x=>x.id===id)||DB.sets[0];
@@ -279,6 +284,8 @@ function problems(){
     else{const L=locate(parseFloat(s.lat),parseFloat(s.lon));if(L&&L.prov&&L.prov!==s.province)p.push(['warn',s.code+': จังหวัดที่ระบุ ('+s.province+') ไม่ตรงกับพิกัด (พิกัดอยู่ จ.'+L.prov+(L.amp?' '+L.amp:'')+') — ตรวจพิกัดหรือจังหวัด']);else{const am=ampMismatch(s,L);if(am)p.push(['warn',s.code+': ที่ตั้งระบุ อ.'+am+' แต่พิกัดอยู่ '+ampTxt(L.amp)+' จ.'+L.prov+' — ตรวจพิกัด (ถ้าอยู่ใกล้เขตแดนอำเภออาจไม่ใช่ข้อผิดพลาด)']);}}
     if(!DB.sets.some(x=>x.id===s.set))p.push(['bad',s.code+': ไม่ได้เลือกชุดข้อมูล']);
   });
+  DB.sets.forEach(x=>{const pv={};DB.stations.filter(s=>s.set===x.id).forEach(s=>{if(s.province)(pv[s.province]=pv[s.province]||[]).push(s);});
+    Object.keys(pv).forEach(pn=>{if(!pv[pn].some(s=>s.rep===true))p.push(['warn','ชุด '+x.label+' จ.'+pn+': ยังไม่ได้ติ๊กสถานีตัวแทนจังหวัด — ในโหมดตัวแทน จังหวัดนี้จะไม่ถูกนับในค่า 8/9 จังหวัด']);});});
   DB.stations.forEach(s=>{let n=0;Object.values(DB.daily[s.code]||{}).forEach(ys=>ys.forEach(a=>a.forEach(v=>{if(v!=null)n++;})));if(!n)p.push(['warn',s.code+': ยังไม่มีข้อมูลรายวันเลย']);});
   return p;
 }
@@ -341,15 +348,18 @@ function stFlag(s){
 function renderSt(){
   const provs=[];DB.stations.forEach(s=>{if(s.province&&provs.indexOf(s.province)<0)provs.push(s.province);});
   $('provlist').innerHTML=provs.map(p=>'<option value="'+esc(p)+'">').join('');
-  $('st-table').innerHTML='<thead><tr><th>#</th><th>ลำดับ</th><th>ชุดข้อมูล</th><th>รหัสสถานี</th><th>ที่ตั้ง</th><th>จังหวัด</th><th>ละติจูด (N)</th><th>ลองจิจูด (E)</th><th>สถานะพิกัด</th><th></th></tr></thead><tbody>'
+  $('st-table').innerHTML='<thead><tr><th>#</th><th>ลำดับ</th><th>ชุดข้อมูล</th><th>รหัสสถานี</th><th>ที่ตั้ง</th><th>จังหวัด</th><th title="สถานีที่ใช้เป็นตัวแทนจังหวัดเมื่อคำนวณค่า 8/9 จังหวัดในโหมดตัวแทน">ตัวแทน<br>จังหวัด</th><th>ละติจูด (N)</th><th>ลองจิจูด (E)</th><th>สถานะพิกัด</th><th></th></tr></thead><tbody>'
    +DB.stations.map((s,i)=>'<tr data-i="'+i+'"><td>'+(i+1)+'</td><td style="white-space:nowrap"><button class="btn s" data-a="up">↑</button> <button class="btn s" data-a="dn">↓</button></td>'
    +'<td><select data-f="set">'+DB.sets.map(x=>'<option value="'+esc(x.id)+'"'+(x.id===s.set?' selected':'')+'>'+esc(x.label)+'</option>').join('')+'</select></td><td><input data-f="code" value="'+esc(s.code)+'" style="width:90px"></td><td><input data-f="location" value="'+esc(s.location)+'"></td>'
    +'<td><input data-f="province" list="provlist" value="'+esc(s.province)+'" style="width:140px"></td>'
+   +'<td style="text-align:center"><input type="checkbox" data-f="rep"'+(s.rep===true?' checked':'')+' title="ติ๊ก = ใช้สถานีนี้เป็นตัวแทนจังหวัด"></td>'
    +'<td><input class="num" data-f="lat" value="'+esc(s.lat==null?'':s.lat)+'" inputmode="decimal"></td><td><input class="num" data-f="lon" value="'+esc(s.lon==null?'':s.lon)+'" inputmode="decimal"></td>'
    +'<td class="fl">'+stFlag(s)+'</td><td><button class="btn s d" data-a="del">ลบ</button></td></tr>').join('')+'</tbody>';
 }
 $('st-table').addEventListener('change',e=>{
-  const inp=e.target;if(!inp.dataset.f)return;const tr=inp.closest('tr'),i=+tr.dataset.i,s=DB.stations[i],f=inp.dataset.f;let v=inp.value.trim();
+  const inp=e.target;if(!inp.dataset.f)return;const tr=inp.closest('tr'),i=+tr.dataset.i,s=DB.stations[i],f=inp.dataset.f;
+  if(f==='rep'){s.rep=inp.checked;touch();return;}
+  let v=inp.value.trim();
   if(f==='code'){
     if(!v||!/^[A-Za-z0-9_-]+$/.test(v)){alert('รหัสสถานีใช้ได้เฉพาะตัวอักษรอังกฤษ ตัวเลข _ และ - เท่านั้น (ใช้ตั้งชื่อไฟล์ในรีโป)');inp.value=s.code;return;}
     if(DB.stations.some((x,j)=>j!==i&&x.code===v)){alert('รหัสสถานีซ้ำ');inp.value=s.code;return;}
@@ -370,7 +380,7 @@ $('st-table').addEventListener('click',e=>{
   else return;
   touch();renderSt();fillDailySel();
 });
-$('st-add').onclick=()=>{let n=1;while(DB.stations.some(s=>s.code==='new'+n))n++;DB.stations.push({code:'new'+n,set:DB.sets[0].id,location:'',province:'',lat:null,lon:null});touch();renderSt();};
+$('st-add').onclick=()=>{let n=1;while(DB.stations.some(s=>s.code==='new'+n))n++;DB.stations.push({code:'new'+n,set:DB.sets[0].id,location:'',province:'',lat:null,lon:null,rep:false});touch();renderSt();};
 
 /* ---------- รายวัน ---------- */
 function fillDailySel(){
@@ -667,7 +677,7 @@ function applyRaw(){
         const s=DB.stations.find(x=>x.code.toLowerCase()===r.code.toLowerCase());
         if(s){const chg=Math.abs((+s.lat||0)-r.lat)>1e-6||Math.abs((+s.lon||0)-r.lon)>1e-6||(r.location&&r.location!==s.location)||(r.province&&r.province!==s.province);
           if(r.location)s.location=r.location;if(r.province)s.province=r.province;s.lat=r.lat;s.lon=r.lon;if(chg)tot.upd++;}
-        else{const L=locate(r.lat,r.lon);DB.stations.push({code:r.code,set:tset,location:r.location||(L&&L.amp?('อ.'+L.amp.replace(/^กิ่งอำเภอ/,'')):''),province:r.province||(L&&L.prov)||'',lat:r.lat,lon:r.lon});tot.add++;}
+        else{const L=locate(r.lat,r.lon);DB.stations.push({code:r.code,set:tset,rep:false,location:r.location||(L&&L.amp?('อ.'+L.amp.replace(/^กิ่งอำเภอ/,'')):''),province:r.province||(L&&L.prov)||'',lat:r.lat,lon:r.lon});tot.add++;}
       });
     }else if(it.roniRows){it.roniRows.forEach(r=>{DB.roni[r.y]=Object.assign(DB.roni[r.y]||{},r.o);tot.roni++;});}
   });
@@ -754,6 +764,7 @@ function renderGroups(){
     +'<span class="note">รหัส: <b>'+esc(g.id)+'</b> · '+g.provinces.length+' จังหวัด'+(g.provinces.length<2?' (ต้องมีอย่างน้อย 2 จึงจะแสดง)':'')+'</span><button class="btn s d" data-gdel="'+i+'">ลบกลุ่ม</button></div>'
     +'<div class="bar">'+provs.map(p=>'<label style="min-width:104px"><input type="checkbox" data-gp="'+esc(p)+'"'+(g.provinces.indexOf(p)>=0?' checked':'')+'> '+esc(p)+'</label>').join('')+'</div></div>').join('');
   $('s-gm').value=DB.settings.groupMethod==='station'?'station':'province';
+  $('s-gsm').value=DB.settings.groupStationMode==='rep'?'rep':'all';
   $('s-smoke').innerHTML=MTH_TH.map((m,i)=>'<label style="min-width:62px"><input type="checkbox" data-sm="'+(i+1)+'"'+((DB.settings.smokeMonths||[]).indexOf(i+1)>=0?' checked':'')+'> '+m+'</label>').join('');
 }
 $('grp-box').addEventListener('change',e=>{
@@ -774,6 +785,7 @@ $('grp-add').onclick=()=>{
   DB.groups.push({id,label,provinces:[],color:'#555555'});touch();renderGroups();
 };
 $('s-gm').addEventListener('change',e=>{DB.settings.groupMethod=e.target.value;touch();});
+$('s-gsm').addEventListener('change',e=>{DB.settings.groupStationMode=e.target.value;touch();});
 $('s-smoke').addEventListener('change',e=>{
   const ms=[...document.querySelectorAll('#s-smoke [data-sm]')].filter(x=>x.checked).map(x=>+x.dataset.sm);
   if(ms.length<1||ms.length>11){alert('ต้องเลือกอย่างน้อย 1 เดือนและไม่เกิน 11 เดือน');renderGroups();return;}
@@ -825,7 +837,7 @@ const numOrNull=v=>v===''||v==null||!isFinite(parseFloat(v))?null:+v;
 function serialize(db){
   const f={};
   const cfg={meta:db.meta,settings:db.settings,sets:db.sets,groups:db.groups,
-    stations:db.stations.map(s=>({code:s.code,set:s.set,location:s.location,province:s.province,lat:numOrNull(s.lat),lon:numOrNull(s.lon)})),roni:db.roni};
+    stations:db.stations.map(s=>({code:s.code,set:s.set,location:s.location,province:s.province,lat:numOrNull(s.lat),lon:numOrNull(s.lon),rep:s.rep===true})),roni:db.roni};
   f['config.js']='window.PM25_CFG='+JSON.stringify(cfg,null,1)+';\n';
   db.stations.forEach(s=>{const d=pruneDaily(db.daily[s.code]);if(Object.keys(d).length)f['daily/'+s.code+'.js']='window.PM25_DAILY=window.PM25_DAILY||{};window.PM25_DAILY['+JSON.stringify(s.code)+']='+JSON.stringify(d)+';\n';});
   return f;

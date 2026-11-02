@@ -158,6 +158,18 @@ pre.log{background:var(--soft);padding:10px;border-radius:8px;white-space:pre-wr
       <label>WHO (µg/m³, เกินเมื่อ &gt;) <input id="s-who" type="number" step="0.1" style="width:90px"></label>
     </div>
   </div>
+  <div class="card">
+    <h2>กลุ่มจังหวัด (คอลัมน์ "ภาพรวม" ในตารางหน้าเว็บ)</h2>
+    <p class="note">แต่ละกลุ่มแสดงเป็นคอลัมน์ในตารางความเข้มข้น วันที่เกินมาตรฐาน และ Baseline (อยู่ซ้ายสุด ก่อนคอลัมน์จังหวัด) · ค่าเริ่มต้น: <b>8 จังหวัด</b> = 9 จังหวัดไม่รวมตาก, <b>9 จังหวัด</b> = ทั้งหมด · กลุ่มจะแสดงในชุดข้อมูลที่มี<b>ครบทุกจังหวัดของกลุ่ม</b>เท่านั้น (เช่น ชุด 3 สถานีไม่แสดง) และต้องมีอย่างน้อย 2 จังหวัด · ค่ากลุ่มของปี/เดือนจะแสดงเมื่ออย่างน้อย 80% ของจังหวัดในกลุ่มมีข้อมูลผ่านเกณฑ์</p>
+    <div id="grp-box"></div>
+    <div class="bar"><button class="btn" id="grp-add">+ เพิ่มกลุ่มจังหวัด</button>
+      <label>วิธีคำนวณค่ากลุ่ม <select id="s-gm"><option value="province">เฉลี่ยของจังหวัด (ทุกจังหวัดน้ำหนักเท่ากัน)</option><option value="station">เฉลี่ยของสถานีทั้งหมดในกลุ่ม</option></select></label></div>
+  </div>
+  <div class="card">
+    <h2>ช่วงหมอกควัน (Smoke haze)</h2>
+    <p class="note">เดือนที่ติ๊กจะนับเป็น "ช่วงหมอกควัน" ส่วนเดือนที่เหลือเป็น "นอกช่วงหมอกควัน" ใช้เป็นตัวเลือก "ช่วงของปี" ในหน้าแผนที่/ความเข้มข้น/วันที่เกินมาตรฐาน และปุ่มลัดของตัวเลือกเดือน · ค่าเริ่มต้น ก.พ.–พ.ค.</p>
+    <div class="bar" id="s-smoke"></div>
+  </div>
   <div id="sets-box"></div>
   <div class="bar"><button class="btn" id="set-add">+ เพิ่มชุดข้อมูลใหม่</button><span class="note">ชุดข้อมูลคือกลุ่มสถานีที่แสดงแยกกันบนหน้าบ้าน (เช่น 11 สถานี / 3 สถานี) แต่ละชุดมีช่วงปีและเกณฑ์ข้อมูลครบของตัวเอง</span></div>
   <div class="card">
@@ -217,7 +229,8 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 let DB,SRC,saveT=null,published=true;
 function normalize(){
   DB.meta=DB.meta||{};
-  DB.settings=Object.assign({th:37.5,who:15},DB.settings||{});
+  DB.settings=Object.assign({th:37.5,who:15,groupMethod:'province',smokeMonths:[2,3,4,5]},DB.settings||{});
+  if(!Array.isArray(DB.groups)||!DB.groups.length){const g8=['เชียงใหม่','เชียงราย','ลำปาง','ลำพูน','แม่ฮ่องสอน','น่าน','พะเยา','แพร่'];DB.groups=[{id:'g8',label:'8 จังหวัด',provinces:g8.slice(),color:'#222222'},{id:'g9',label:'9 จังหวัด',provinces:g8.concat(['ตาก']),color:'#B2182B'}];}
   DB.stations=DB.stations||[];DB.daily=DB.daily||{};DB.roni=DB.roni||{};
   if(!Array.isArray(DB.sets)||!DB.sets.length){  // ย้ายข้อมูลจากโครงสร้างเวอร์ชันเก่า
     DB.sets=[{id:'k11',label:'11 สถานี',sub:'กรมควบคุมมลพิษ',years:(DB.meta.years||[2012,2025]).slice(),minCoverage:(DB.settings.minCoverage!=null?DB.settings.minCoverage:0.75),sampled:false,source:DB.meta.source||'',note:''}];
@@ -715,6 +728,7 @@ function roniCls(v){
 }
 const SEAS=[['smoke','ฤดูหมอกควัน'],['non','นอกฤดูหมอกควัน'],['ann','ทั้งปี']];
 function renderSet(){
+  renderGroups();
   $('s-title').value=DB.meta.title||'';$('s-th').value=DB.settings.th;$('s-who').value=DB.settings.who;
   $('sets-box').innerHTML=DB.sets.map((x,i)=>'<div class="card" style="background:var(--soft)" data-si="'+i+'"><h2 style="font-size:15px">ชุดข้อมูล: '+esc(x.label)+'</h2><div class="bar">'
    +'<label>ชื่อ <input data-sf="label" value="'+esc(x.label)+'" style="width:130px"></label><label>คำอธิบายสั้น <input data-sf="sub" value="'+esc(x.sub||'')+'" style="width:170px"></label>'
@@ -730,6 +744,41 @@ function renderSet(){
 }
 [['s-title',v=>DB.meta.title=v]].forEach(a=>$(a[0]).addEventListener('change',e=>{a[1](e.target.value);touch();}));
 [['s-th','th'],['s-who','who']].forEach(a=>$(a[0]).addEventListener('change',e=>{const v=parseFloat(e.target.value);if(!isFinite(v)||v<=0){alert('ใส่ตัวเลขที่มากกว่า 0');e.target.value=DB.settings[a[1]];return;}DB.settings[a[1]]=v;touch();}));
+const MTH_TH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+function allProvinces(){const a=[];DB.stations.forEach(s=>{if(s.province&&a.indexOf(s.province)<0)a.push(s.province);});DB.groups.forEach(g=>g.provinces.forEach(p=>{if(a.indexOf(p)<0)a.push(p);}));return a;}
+function renderGroups(){
+  const provs=allProvinces();
+  $('grp-box').innerHTML=DB.groups.map((g,i)=>'<div class="card" style="background:var(--soft)" data-gi="'+i+'"><div class="bar">'
+    +'<label>ชื่อกลุ่ม <input data-gf="label" value="'+esc(g.label)+'" style="width:150px"></label>'
+    +'<label>สี <input type="color" data-gf="color" value="'+esc(g.color||'#222222')+'" style="width:46px;padding:0;height:28px"></label>'
+    +'<span class="note">รหัส: <b>'+esc(g.id)+'</b> · '+g.provinces.length+' จังหวัด'+(g.provinces.length<2?' (ต้องมีอย่างน้อย 2 จึงจะแสดง)':'')+'</span><button class="btn s d" data-gdel="'+i+'">ลบกลุ่ม</button></div>'
+    +'<div class="bar">'+provs.map(p=>'<label style="min-width:104px"><input type="checkbox" data-gp="'+esc(p)+'"'+(g.provinces.indexOf(p)>=0?' checked':'')+'> '+esc(p)+'</label>').join('')+'</div></div>').join('');
+  $('s-gm').value=DB.settings.groupMethod==='station'?'station':'province';
+  $('s-smoke').innerHTML=MTH_TH.map((m,i)=>'<label style="min-width:62px"><input type="checkbox" data-sm="'+(i+1)+'"'+((DB.settings.smokeMonths||[]).indexOf(i+1)>=0?' checked':'')+'> '+m+'</label>').join('');
+}
+$('grp-box').addEventListener('change',e=>{
+  const card=e.target.closest('[data-gi]');if(!card)return;const g=DB.groups[+card.dataset.gi];
+  if(e.target.dataset.gf==='label'){const v=e.target.value.trim();if(!v){alert('ชื่อกลุ่มต้องไม่ว่าง');e.target.value=g.label;return;}g.label=v;}
+  else if(e.target.dataset.gf==='color')g.color=e.target.value;
+  else if(e.target.dataset.gp!=null){const p=e.target.dataset.gp,k=g.provinces.indexOf(p);if(e.target.checked&&k<0)g.provinces.push(p);else if(!e.target.checked&&k>=0)g.provinces.splice(k,1);renderGroups();}
+  touch();
+});
+$('grp-box').addEventListener('click',e=>{
+  const b=e.target.closest('[data-gdel]');if(!b)return;const i=+b.dataset.gdel;
+  if(!confirm('ลบกลุ่ม "'+DB.groups[i].label+'" ใช่หรือไม่?'))return;DB.groups.splice(i,1);touch();renderGroups();
+});
+$('grp-add').onclick=()=>{
+  const id=(prompt('รหัสกลุ่มใหม่ (ตัวอักษรอังกฤษ/ตัวเลข เช่น g5)')||'').trim();if(!id)return;
+  if(!/^[A-Za-z0-9_-]+$/.test(id)||DB.groups.some(x=>x.id===id)){alert('รหัสไม่ถูกต้องหรือซ้ำกับที่มีอยู่');return;}
+  const label=(prompt('ชื่อกลุ่มที่แสดงเป็นหัวคอลัมน์ (เช่น 5 จังหวัด)')||id).trim();
+  DB.groups.push({id,label,provinces:[],color:'#555555'});touch();renderGroups();
+};
+$('s-gm').addEventListener('change',e=>{DB.settings.groupMethod=e.target.value;touch();});
+$('s-smoke').addEventListener('change',e=>{
+  const ms=[...document.querySelectorAll('#s-smoke [data-sm]')].filter(x=>x.checked).map(x=>+x.dataset.sm);
+  if(ms.length<1||ms.length>11){alert('ต้องเลือกอย่างน้อย 1 เดือนและไม่เกิน 11 เดือน');renderGroups();return;}
+  DB.settings.smokeMonths=ms;touch();
+});
 $('sets-box').addEventListener('click',e=>{
   const b=e.target.closest('[data-sdel]');if(!b)return;const i=+b.dataset.sdel,x=DB.sets[i];
   if(DB.stations.some(s=>s.set===x.id)){alert('ลบไม่ได้: ชุดนี้ยังมีสถานีอยู่ ย้ายหรือลบสถานีออกจากชุดนี้ก่อน');return;}
@@ -775,7 +824,7 @@ function pruneDaily(d){const o={};Object.keys(d||{}).forEach(y=>{if(d[y]&&d[y].s
 const numOrNull=v=>v===''||v==null||!isFinite(parseFloat(v))?null:+v;
 function serialize(db){
   const f={};
-  const cfg={meta:db.meta,settings:db.settings,sets:db.sets,
+  const cfg={meta:db.meta,settings:db.settings,sets:db.sets,groups:db.groups,
     stations:db.stations.map(s=>({code:s.code,set:s.set,location:s.location,province:s.province,lat:numOrNull(s.lat),lon:numOrNull(s.lon)})),roni:db.roni};
   f['config.js']='window.PM25_CFG='+JSON.stringify(cfg,null,1)+';\n';
   db.stations.forEach(s=>{const d=pruneDaily(db.daily[s.code]);if(Object.keys(d).length)f['daily/'+s.code+'.js']='window.PM25_DAILY=window.PM25_DAILY||{};window.PM25_DAILY['+JSON.stringify(s.code)+']='+JSON.stringify(d)+';\n';});

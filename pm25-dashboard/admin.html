@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>หลังบ้าน — PM2.5 ภาคเหนือตอนบน</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1f4;--panel:#fff;--ink:#16222d;--mute:#5b6b7a;--line:#d5dce3;--acc:#0f6a85;--accink:#fff;--soft:#e6f0f4;--bad:#c0392b;--warn:#b45309;--ok:#1e8a4c}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 'Sarabun','Noto Sans Thai',Tahoma,sans-serif}
+button,select,input,textarea{font:inherit;color:inherit}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--panel);border-bottom:1px solid var(--line)}
+.top h1{margin:0;font-size:20px}.top p{margin:0;font-size:13px;color:var(--mute)}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:6px 13px;cursor:pointer;text-decoration:none;display:inline-block;font-size:13.5px}
+.btn:hover{border-color:var(--acc)}.btn.pri{background:var(--acc);color:var(--accink);border-color:var(--acc)}
+.btn.s{padding:2px 9px;font-size:12.5px}.btn.d{color:var(--bad);border-color:#e3b5ae}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tabs{display:flex;gap:2px;padding:0 22px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{border:0;background:none;padding:11px 16px;cursor:pointer;color:var(--mute);border-bottom:3px solid transparent;font-size:15px;white-space:nowrap}
+.tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--acc)}
+main{max-width:1280px;margin:0 auto;padding:16px 22px 50px}
+.pg{display:none}.pg.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.card h2{margin:0 0 6px;font-size:17px}
+.note{font-size:13px;color:var(--mute);margin:4px 0}
+.info{background:#fff4c7;color:#5c4a00;border-radius:8px;padding:9px 14px;font-size:13.5px;margin-bottom:14px;line-height:1.7}
+.bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:8px 0}
+.bar label{display:flex;gap:6px;align-items:center}
+input,select,textarea{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:4px 8px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--acc);outline-offset:0}
+table.t{border-collapse:collapse;font-size:14px;width:100%}
+.t th,.t td{border:1px solid var(--line);padding:4px 6px;text-align:left;vertical-align:middle}
+.t th{background:var(--soft)}
+.t input{width:100%}.t input.num{width:110px;text-align:right}
+.wrap{overflow:auto;max-height:72vh;border-radius:6px}
+table.g{border-collapse:separate;border-spacing:0;font-size:13px}
+.g th,.g td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:0;text-align:center}
+.g th{background:var(--soft);padding:4px 6px;position:sticky;top:0;z-index:2}
+.g tbody th{position:sticky;left:0;z-index:1;top:auto}
+.g thead th:first-child{left:0;z-index:3}
+.g input{width:64px;border:0;border-radius:0;text-align:right;padding:4px 6px;background:transparent}
+.g input.o1{background:#fff1d6}.g input.o2{background:#ffd9d2}.g input.bad{background:#f7b4ab}
+.g td.na{background:#eceff2}
+.g tfoot td,.g tfoot th{background:var(--soft);font-weight:700;padding:4px 6px;position:sticky;bottom:0}
+.cov td{text-align:center;cursor:pointer;min-width:52px}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+pre.log{background:var(--soft);padding:10px;border-radius:8px;white-space:pre-wrap;font-size:13px;max-height:260px;overflow:auto}
+#err{display:none;background:#fde8e4;color:#8a2616;padding:8px 22px;font-size:13px}
+@media(max-width:700px){.top,.tabs,main{padding-left:12px;padding-right:12px}}
+</style>
+</head>
+<body>
+<div id="err"></div>
+<header class="top">
+  <div><h1>หลังบ้าน — จัดการข้อมูล PM2.5</h1><p id="status"></p></div>
+  <div class="tools">
+    <button class="btn pri" id="b-gh">บันทึกขึ้น GitHub</button>
+    <button class="btn" id="b-preview">ดูหน้าบ้านด้วยข้อมูลฉบับร่าง</button>
+    <button class="btn d" id="b-reset">ล้างฉบับร่าง</button>
+    <a class="btn" href="manual.html" target="_blank">คู่มือ</a>
+    <a class="btn" href="index.html">กลับหน้าบ้าน</a>
+  </div>
+</header>
+<nav class="tabs" id="tabs">
+  <button data-pg="st">สถานีและพิกัด</button>
+  <button data-pg="daily">ค่าฝุ่นรายวัน</button>
+  <button data-pg="cov">ความครบถ้วนของข้อมูล</button>
+  <button data-pg="io">นำเข้า / ส่งออก</button>
+  <button data-pg="set">ค่ามาตรฐานและ RONI</button>
+  <button data-pg="gh">GitHub</button>
+</nav>
+<main>
+<div class="info"><b>วิธีทำงาน:</b> ข้อมูลทั้งหมดเก็บเป็นไฟล์ในโฟลเดอร์ <code>data/</code> ของรีโป GitHub · 1) แก้ไขข้อมูลในหน้านี้ (ระบบบันทึกฉบับร่างในเบราว์เซอร์อัตโนมัติ) → 2) ดูผลก่อนด้วยปุ่ม "ดูหน้าบ้านด้วยข้อมูลฉบับร่าง" → 3) ไปแท็บ <b>GitHub</b> กดบันทึกขึ้นรีโป (ระบบ commit เฉพาะไฟล์ที่เปลี่ยนให้) → เว็บบน GitHub Pages จะอัปเดตเองใน 1–2 นาที<br>
+<b>ความปลอดภัย:</b> หน้านี้เป็นไฟล์ static ไม่มีระบบล็อกอิน การแก้ไขเก็บในเบราว์เซอร์ของผู้แก้เท่านั้น ข้อมูลบนเว็บจริงเปลี่ยนได้ก็ต่อเมื่อมี token ของ GitHub ที่มีสิทธิ์เขียนในรีโป · ไม่ต้องการให้คนทั่วไปเห็นหน้านี้ ให้ไม่อัปโหลด admin.html ขึ้นรีโปสาธารณะ</div>
+
+<!-- สถานี -->
+<section id="pg-st" class="pg">
+  <div class="card">
+    <h2>สถานีและพิกัด</h2>
+    <p class="note">แต่ละสถานีต้องเลือก <b>ชุดข้อมูล</b> (เช่น 11 สถานี หรือ 3 สถานี) · ลำดับในตารางนี้ = ลำดับคอลัมน์สถานีในตารางของหน้าบ้านภายในชุดเดียวกัน (จังหวัดเรียงตามสถานีแรกของแต่ละจังหวัด) · พิกัดเป็นองศาทศนิยม (WGS84) · จังหวัดที่ไม่มีใน shapefile 9 จังหวัดจะไม่มีขอบเขตบนแผนที่ แต่ยังแสดงในตารางได้</p>
+    <div class="bar"><button class="btn pri" id="st-add">+ เพิ่มสถานี</button></div>
+    <div class="wrap"><table class="t" id="st-table"></table></div>
+    <datalist id="provlist"></datalist>
+  </div>
+</section>
+
+<!-- รายวัน -->
+<section id="pg-daily" class="pg">
+  <div class="card">
+    <h2>ค่าฝุ่นรายวัน (µg/m³)</h2>
+    <p class="note">พิมพ์ค่าในช่อง หรือคัดลอกจาก Excel แล้ววางลงช่องเริ่มต้นได้ (วางหลายแถว/หลายคอลัมน์) · เว้นว่าง = ไม่มีข้อมูล · สีส้มอ่อน = เกิน WHO · สีแดงอ่อน = เกินมาตรฐานไทย</p>
+    <div class="bar">
+      <label>สถานี <select id="d-st"></select></label>
+      <label>ปี <select id="d-y"></select></label>
+      <button class="btn d" id="d-clear">ลบข้อมูลทั้งปีของสถานีนี้</button>
+      <span id="d-sum" class="note"></span>
+    </div>
+    <div class="bar"><b style="font-size:14px">ลบข้อมูลตามช่วงวันที่ (สถานีที่เลือกด้านบน):</b><label>ตั้งแต่ <input type="date" id="d-from"></label><label>ถึง <input type="date" id="d-to"></label><button class="btn d" id="d-del">ลบข้อมูลช่วงนี้</button></div>
+    <div class="wrap" id="d-grid"></div>
+  </div>
+</section>
+
+<!-- ความครบถ้วน -->
+<section id="pg-cov" class="pg">
+  <div class="card">
+    <h2>ความครบถ้วนของข้อมูล (จำนวนวันที่มีค่าในแต่ละปี)</h2>
+    <p class="note">สีเขียว ≥ 90% · เหลือง 75–89% · ส้ม 1–74% · เทา = ไม่มีข้อมูล · คลิกช่องเพื่อไปแก้ไขข้อมูลปีนั้น</p>
+    <div class="wrap"><table class="t cov" id="cov-table"></table></div>
+  </div>
+</section>
+
+<!-- นำเข้า/ส่งออก -->
+<section id="pg-io" class="pg">
+  <div class="card">
+    <h2>นำเข้าข้อมูลจากไฟล์ดิบ (Excel / CSV)</h2>
+    <p class="note">เลือกไฟล์ได้หลายไฟล์พร้อมกัน ระบบดูโครงสร้างของแต่ละชีตให้เองและแสดงตัวอย่างก่อนนำเข้า (ยังไม่มีอะไรเปลี่ยนจนกว่าจะกดยืนยัน) รูปแบบที่รู้จัก:
+      <b>(1)</b> ตารางรายสถานี — ชีตชื่อ <code>PM2.5_รหัสสถานี</code> แถวบนเป็นปีและเดือน แถวล่างเป็นวันที่ 1–31 (ไฟล์ <code>PM2_5_NorthernThailand_for_datatool</code>)
+      <b>(2)</b> ตารางวันที่ × สถานี — คอลัมน์ <code>Date</code> แล้วตามด้วยรหัสสถานี (ชีต <code>PM2.5_Combined</code> ของไฟล์ CM/LP/LI)
+      <b>(3)</b> รายการ <code>Date, ID, PM2.5</code> ต่อชีต หรือ <code>date, code, value</code>
+      <b>(4)</b> พิกัดสถานี — คอลัมน์ <code>Station Number, Location, Province, Latitude, Longtitude</code>
+      <b>(5)</b> ค่า RONI — ไฟล์ <code>enso_config</code> (<code>year, smoke_avg, …</code>)</p>
+    <div class="bar"><input type="file" id="r-file" multiple accept=".xlsx,.xls,.csv,.txt"></div>
+    <div class="bar">
+      <label>ถ้ามีข้อมูลวันที่นั้นอยู่แล้ว
+        <select id="r-mode"><option value="merge">เพิ่มและแก้ค่าตามไฟล์ (ค่าเดิมที่ไฟล์ไม่มีจะคงไว้)</option><option value="add">เติมเฉพาะวันที่ยังไม่มีค่า (ไม่แตะค่าเดิม)</option><option value="replace">แทนที่ทั้งปีของสถานีที่อยู่ในไฟล์ (ค่าที่ไฟล์ไม่มีจะถูกลบ)</option></select></label>
+      <label>ข้อมูลที่อยู่นอกช่วงปีของชุดข้อมูล
+        <select id="r-ext"><option value="skip">ข้าม (แจ้งว่าข้ามกี่ค่า)</option><option value="extend">ขยายช่วงปีให้ครอบคลุมอัตโนมัติ</option></select></label>
+      <label>สถานีใหม่ใส่ในชุดข้อมูล <select id="r-set"></select></label>
+    </div>
+    <div id="r-list"></div>
+    <div class="bar"><button class="btn pri" id="r-apply" disabled>ยืนยันนำเข้าตามที่ติ๊ก</button></div>
+    <pre class="log" id="r-log">ยังไม่ได้เลือกไฟล์</pre>
+  </div>
+  <div class="card">
+    <h2>ส่งออกและสำรองข้อมูล</h2>
+    <p class="note">ปุ่มด้านล่างสำหรับสำรองหรือนำข้อมูลไปใช้ต่อในโปรแกรมอื่น · การเผยแพร่ขึ้นเว็บให้ใช้แท็บ GitHub</p>
+    <div class="bar">
+      <button class="btn" id="x-json">สำรองข้อมูลทั้งหมด (JSON)</button>
+      <button class="btn pri" id="x-xlsx">ค่ารายวันทั้งหมดเป็น Excel รูปแบบเดิม (ชีตละสถานี)</button>
+      <button class="btn" id="x-csv">ค่ารายวันทั้งหมด (CSV แบบกว้าง)</button>
+      <button class="btn" id="x-roni">ค่า RONI (CSV รูปแบบเดิม)</button>
+      <button class="btn" id="x-st">ตารางสถานี (CSV)</button>
+    </div>
+    <div class="bar"><label>กู้คืนจากไฟล์สำรอง (JSON) <input type="file" id="x-restore" accept=".json,application/json"></label></div>
+    <h2 style="margin-top:14px;font-size:15px">ตรวจสอบก่อนเผยแพร่</h2>
+    <div id="x-check"></div>
+  </div>
+</section>
+
+<!-- ตั้งค่า -->
+<section id="pg-set" class="pg">
+  <div class="card">
+    <h2>ค่ามาตรฐานและข้อมูลทั่วไป</h2>
+    <div class="bar">
+      <label>ชื่อระบบ <input id="s-title" style="width:320px"></label>
+      <label>มาตรฐานไทย (µg/m³, เกินเมื่อ &gt;) <input id="s-th" type="number" step="0.1" style="width:90px"></label>
+      <label>WHO (µg/m³, เกินเมื่อ &gt;) <input id="s-who" type="number" step="0.1" style="width:90px"></label>
+    </div>
+  </div>
+  <div id="sets-box"></div>
+  <div class="bar"><button class="btn" id="set-add">+ เพิ่มชุดข้อมูลใหม่</button><span class="note">ชุดข้อมูลคือกลุ่มสถานีที่แสดงแยกกันบนหน้าบ้าน (เช่น 11 สถานี / 3 สถานี) แต่ละชุดมีช่วงปีและเกณฑ์ข้อมูลครบของตัวเอง</span></div>
+  <div class="card">
+    <h2>ค่า RONI รายปี</h2>
+    <p class="note">ใส่ค่าเฉลี่ย RONI ของแต่ละปีตามช่วงเวลา (ฤดูหมอกควัน / นอกฤดู / ทั้งปี) ระบบจัดประเภทให้อัตโนมัติ: &gt; +0.5 = El Niño · &lt; −0.5 = La Niña · อื่นๆ = Neutral · ความแรงจากค่าที่ปัดทศนิยม 1 ตำแหน่ง (&lt;1.0 Weak, &lt;1.5 Moderate, &lt;2.0 Strong, ≥2.0 Very Strong) · ใช้ในแถบ RONI ของกราฟและตัวเลือก baseline ตามประเภท ENSO ในหน้าบ้าน</p>
+    <div class="wrap" style="max-height:50vh"><table class="t" id="r-table" style="max-width:640px"></table></div>
+  </div>
+</section>
+<!-- GitHub -->
+<section id="pg-gh" class="pg">
+  <div class="card">
+    <h2>1) เชื่อมต่อ GitHub</h2>
+    <p class="note">ข้อมูลอยู่ที่ <code>data/config.js</code>, <code>data/daily/&lt;รหัสสถานี&gt;.js</code> และ <code>data/geo.js</code> ในรีโป · ต้องมี <b>token</b> ที่มีสิทธิ์เขียนรีโปนี้ (สร้างที่ GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → เลือกเฉพาะรีโปนี้ → Repository permissions: <b>Contents = Read and write</b> และตั้งวันหมดอายุ) · token จะถูกเก็บในแท็บนี้เท่านั้น ยกเว้นติ๊ก "จำ token"</p>
+    <div class="bar">
+      <label>เจ้าของรีโป (owner) <input id="g-owner" style="width:150px" autocomplete="off"></label>
+      <label>ชื่อรีโป <input id="g-repo" style="width:170px" autocomplete="off"></label>
+      <label>branch <input id="g-branch" value="main" style="width:90px"></label>
+      <label>โฟลเดอร์รากของเว็บ (เว้นว่าง = รากของรีโป, ถ้าใช้ /docs ให้ใส่ docs) <input id="g-root" style="width:110px"></label>
+    </div>
+    <div class="bar">
+      <label>Token <input id="g-token" type="password" style="width:340px" autocomplete="off" placeholder="github_pat_..."></label>
+      <label><input type="checkbox" id="g-remember"> จำ token ในเบราว์เซอร์เครื่องนี้</label>
+    </div>
+    <div class="bar"><button class="btn" id="g-test">ทดสอบการเชื่อมต่อ</button><button class="btn" id="g-pull">ดึงข้อมูลล่าสุดจาก GitHub</button><span class="note">ควรกด "ดึงข้อมูลล่าสุด" ก่อนเริ่มแก้ไขทุกครั้ง โดยเฉพาะถ้ามีคนอื่นแก้ข้อมูลด้วย</span></div>
+    <pre class="log" id="g-log">ยังไม่ได้เชื่อมต่อ</pre>
+  </div>
+  <div class="card">
+    <h2>2) บันทึกขึ้น GitHub</h2>
+    <p class="note">รายการด้านล่างคือไฟล์ที่ต่างจากที่โหลดมาจากรีโป ระบบจะ commit รวมเป็นครั้งเดียว · ถ้าไม่ต้องการใช้ token ให้กด "ดาวน์โหลด" ทีละไฟล์แล้วอัปโหลดทับในรีโปเอง (Add file → Upload files โดยรักษาโฟลเดอร์ data/ และ data/daily/ ไว้)</p>
+    <div id="g-changes"></div>
+    <div class="bar"><label>ข้อความ commit <input id="g-msg" style="width:420px;max-width:100%" value="อัปเดตข้อมูล PM2.5"></label><button class="btn pri" id="g-commit">บันทึกขึ้น GitHub (commit)</button></div>
+    <pre class="log" id="g-clog">—</pre>
+  </div>
+  <div class="card">
+    <h2>3) ขอบเขตแผนที่ (data/geo.js)</h2>
+    <p class="note">ขอบเขตอำเภอ จังหวัด ประเทศ สร้างจาก shapefile ด้วยสคริปต์ <code>tools/build_geo.py</code> (ดูวิธีใช้ใน README) เมื่อได้ไฟล์ <code>geo.js</code> ใหม่แล้ว เลือกไฟล์ที่นี่เพื่อเตรียมแทนที่ จากนั้นกด commit ในหัวข้อ 2</p>
+    <div class="bar"><input type="file" id="g-geo" accept=".js,text/javascript"><button class="btn s" id="g-geo-clear">ยกเลิกไฟล์ที่เตรียมไว้</button></div>
+    <pre class="log" id="g-glog">ยังไม่ได้เลือกไฟล์</pre>
+  </div>
+</section>
+</main>
+
+<script src="lib/xlsx.full.min.js"></script>
+<script>
+window.__startAdmin=function(){
+'use strict';
+const KEY='pm25_draft_v2';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function showErr(m){const b=$('err');b.textContent=m;b.style.display='block';}
+window.addEventListener('error',e=>showErr('เกิดข้อผิดพลาด: '+e.message));
+const MS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const BOX={lon0:97.10,lon1:101.65,lat0:14.95,lat1:20.75};
+const dim=(y,m)=>new Date(y,m,0).getDate();
+const clone=o=>JSON.parse(JSON.stringify(o));
+
+let DB,SRC,saveT=null,published=true;
+function normalize(){
+  DB.meta=DB.meta||{};
+  DB.settings=Object.assign({th:37.5,who:15},DB.settings||{});
+  DB.stations=DB.stations||[];DB.daily=DB.daily||{};DB.roni=DB.roni||{};
+  if(!Array.isArray(DB.sets)||!DB.sets.length){  // ย้ายข้อมูลจากโครงสร้างเวอร์ชันเก่า
+    DB.sets=[{id:'k11',label:'11 สถานี',sub:'กรมควบคุมมลพิษ',years:(DB.meta.years||[2012,2025]).slice(),minCoverage:(DB.settings.minCoverage!=null?DB.settings.minCoverage:0.75),sampled:false,source:DB.meta.source||'',note:''}];
+  }
+  DB.stations.forEach(s=>{if(!s.set)s.set=DB.sets[0].id;});
+  Object.keys(DB.roni).forEach(y=>{const r=DB.roni[y];if(r&&r.v!=null&&!r.smoke)DB.roni[y]={smoke:{v:r.v,type:r.type,cat:r.cat}};});
+}
+const setOf=id=>DB.sets.find(x=>x.id===id)||DB.sets[0];
+const setYears=id=>{const a=[],st=setOf(id);for(let y=st.years[0];y<=st.years[1];y++)a.push(y);return a;};
+const unionYears=()=>{let a=9999,b=0;DB.sets.forEach(x=>{a=Math.min(a,x.years[0]);b=Math.max(b,x.years[1]);});const r=[];for(let y=a;y<=b;y++)r.push(y);return r;};
+const stationSet=code=>{const s=DB.stations.find(x=>x.code===code);return s?s.set:DB.sets[0].id;};
+let REPO_DB=null;
+(function init(){
+  if(window.PM25_CFG){DB=Object.assign({},clone(window.PM25_CFG),{daily:clone(window.PM25_DAILY||{})});}
+  else{DB={meta:{title:'PM2.5'},settings:{th:37.5,who:15},stations:[],daily:{},roni:{}};}
+  normalize();REPO_DB=clone(DB);SRC=window.PM25_CFG?'ไฟล์ในโฟลเดอร์ data/':'ยังไม่พบ data/config.js (เริ่มจากข้อมูลว่าง)';
+  try{const t=localStorage.getItem(KEY);if(t){DB=JSON.parse(t);normalize();SRC='ฉบับร่างในเบราว์เซอร์ (ยังไม่บันทึกขึ้น GitHub)';published=false;}}catch(e){}
+})();
+function status(msg){$('status').textContent='แหล่งข้อมูล: '+SRC+(msg?' · '+msg:'')+(published?'':' · มีการแก้ไขที่ยังไม่ได้บันทึกขึ้น GitHub');}
+function touch(){published=false;SRC='ฉบับร่างในเบราว์เซอร์ (ยังไม่บันทึกขึ้น GitHub)';clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(DB));status('บันทึกฉบับร่างแล้ว '+new Date().toLocaleTimeString('th-TH'));}catch(e){showErr('บันทึกฉบับร่างในเบราว์เซอร์ไม่ได้ (พื้นที่เต็ม?) — ให้ดาวน์โหลดไฟล์สำรองไว้');}},350);status();}
+
+
+/* ---------- ดาวน์โหลด ---------- */
+function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},800);}
+function dlCSV(rows,name){const t=rows.map(r=>r.map(c=>{c=c==null?'':String(c);return/[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c;}).join(',')).join('\r\n');dl(new Blob(['\ufeff'+t],{type:'text/csv;charset=utf-8'}),name);}
+function cleanDB(){
+  const o=clone(DB);
+  Object.keys(o.daily).forEach(code=>{
+    if(!o.stations.some(s=>s.code===code)){delete o.daily[code];return;}
+    Object.keys(o.daily[code]).forEach(y=>{if(!o.daily[code][y].some(a=>a.some(v=>v!=null)))delete o.daily[code][y];});
+  });
+  delete o.provinces;
+  o.stations.forEach(s=>{s.lat=s.lat===''||s.lat==null?null:+s.lat;s.lon=s.lon===''||s.lon==null?null:+s.lon;});
+  const d=new Date();o.meta.updated=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  return o;
+}
+function problems(){
+  const p=[],codes={};
+  DB.stations.forEach((s,i)=>{
+    if(!s.code)p.push(['bad','แถวที่ '+(i+1)+': ยังไม่มีรหัสสถานี']);
+    else if(codes[s.code])p.push(['bad','รหัสสถานีซ้ำ: '+s.code]);
+    else if(!/^[A-Za-z0-9_-]+$/.test(s.code))p.push(['bad','รหัสสถานี '+s.code+' มีอักขระที่ใช้ตั้งชื่อไฟล์ไม่ได้']);
+    codes[s.code]=1;
+    if(!(isFinite(parseFloat(s.lat))&&isFinite(parseFloat(s.lon))))p.push(['warn',s.code+': ยังไม่มีพิกัด จะไม่แสดงบนแผนที่']);
+    if(!s.province)p.push(['bad',s.code+': ยังไม่ระบุจังหวัด']);
+    else{const L=locate(parseFloat(s.lat),parseFloat(s.lon));if(L&&L.prov&&L.prov!==s.province)p.push(['warn',s.code+': จังหวัดที่ระบุ ('+s.province+') ไม่ตรงกับพิกัด (พิกัดอยู่ จ.'+L.prov+(L.amp?' '+L.amp:'')+') — ตรวจพิกัดหรือจังหวัด']);else{const am=ampMismatch(s,L);if(am)p.push(['warn',s.code+': ที่ตั้งระบุ อ.'+am+' แต่พิกัดอยู่ '+ampTxt(L.amp)+' จ.'+L.prov+' — ตรวจพิกัด (ถ้าอยู่ใกล้เขตแดนอำเภออาจไม่ใช่ข้อผิดพลาด)']);}}
+    if(!DB.sets.some(x=>x.id===s.set))p.push(['bad',s.code+': ไม่ได้เลือกชุดข้อมูล']);
+  });
+  DB.stations.forEach(s=>{let n=0;Object.values(DB.daily[s.code]||{}).forEach(ys=>ys.forEach(a=>a.forEach(v=>{if(v!=null)n++;})));if(!n)p.push(['warn',s.code+': ยังไม่มีข้อมูลรายวันเลย']);});
+  return p;
+}
+$('b-gh').onclick=()=>go('gh');
+$('b-preview').onclick=()=>{try{localStorage.setItem(KEY,JSON.stringify(cleanDB()));}catch(e){showErr('บันทึกฉบับร่างไม่สำเร็จ');return;}window.open('index.html?draft=1','_blank');};
+$('b-reset').onclick=()=>{if(!confirm('ล้างฉบับร่างในเบราว์เซอร์ แล้วกลับไปใช้ข้อมูลจากไฟล์ในโฟลเดอร์ data/ ใช่หรือไม่?'))return;try{localStorage.removeItem(KEY);}catch(e){}location.reload();};
+$('x-json').onclick=()=>dl(new Blob([JSON.stringify(cleanDB())],{type:'application/json'}),'pm25_backup_'+cleanDB().meta.updated+'.json');
+$('x-st').onclick=()=>dlCSV([['code','set','location','province','lat','lon']].concat(DB.stations.map(s=>[s.code,s.set,s.location,s.province,s.lat,s.lon])),'stations.csv');
+$('x-csv').onclick=()=>{
+  const codes=DB.stations.map(s=>s.code),rows=[['date'].concat(codes)];
+  unionYears().forEach(y=>{for(let m=0;m<12;m++)for(let d=0;d<dim(y,m+1);d++){const r=codes.map(c=>{const a=DB.daily[c]&&DB.daily[c][y];return a&&a[m]&&a[m][d]!=null?a[m][d]:'';});if(r.some(v=>v!==''))rows.push([y+'-'+String(m+1).padStart(2,'0')+'-'+String(d+1).padStart(2,'0')].concat(r));}});
+  dlCSV(rows,'pm25_daily_all.csv');
+};
+$('x-restore').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const o=JSON.parse(r.result);if(!Array.isArray(o.stations)||typeof o.daily!=='object')throw new Error('รูปแบบไฟล์ไม่ถูกต้อง');if(!confirm('แทนที่ข้อมูลทั้งหมดด้วยไฟล์สำรองนี้ ใช่หรือไม่?'))return;DB=o;normalize();touch();renderAll();alert('กู้คืนข้อมูลแล้ว');}catch(err){alert('กู้คืนไม่สำเร็จ: '+err.message);}};
+  r.readAsText(f);e.target.value='';
+};
+
+/* ---------- แท็บ ---------- */
+let CUR='st';
+function go(pg){CUR=pg;document.querySelectorAll('.pg').forEach(s=>s.classList.toggle('on',s.id==='pg-'+pg));document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.pg===pg));renderCur();}
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>go(b.dataset.pg));
+function renderCur(){({st:renderSt,daily:renderDaily,cov:renderCov,io:renderIo,set:renderSet,gh:renderGh})[CUR]();}
+function renderAll(){fillDailySel();renderCur();}
+
+/* ---------- สถานี ---------- */
+/* ตรวจพิกัดเทียบกับขอบเขตใน data/geo.js (จุดอยู่ในอำเภอ/จังหวัดไหน) */
+function parseRings(d){const rings=[];(d.match(/M[^M]*/g)||[]).forEach(seg=>{rings.push(seg.slice(1).replace(/Z$/,'').split('L').map(p=>p.split(',').map(Number)));});return rings;}
+function inRings(x,y,rings){let c=false;rings.forEach(r=>{for(let i=0,j=r.length-1;i<r.length;j=i++){const xi=r[i][0],yi=r[i][1],xj=r[j][0],yj=r[j][1];if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))c=!c;}});return c;}
+let GEOIDX=null;
+function geoIndex(){if(GEOIDX||!window.GEO||!window.GEO.provinces)return GEOIDX;GEOIDX=window.GEO.provinces.map(p=>({name:p.name,rings:parseRings(p.d),amphoes:p.amphoes.map(a=>({name:a.name,rings:parseRings(a.d)}))}));return GEOIDX;}
+function locate(lat,lon){
+  const g=geoIndex();if(!g||!isFinite(lat)||!isFinite(lon))return null;
+  const P=window.GEO.proj,x=(lon-P.lon0)*P.kx,y=(P.lat1-lat)*P.ky;
+  for(const p of g){if(inRings(x,y,p.rings)){const a=p.amphoes.find(a=>inRings(x,y,a.rings));return{prov:p.name,amp:a?a.name:''};}}
+  return{prov:'',amp:''};
+}
+/* เทียบอำเภอที่เขียนในช่องที่ตั้ง (เช่น "ต. บ้านกลาง อ. เมือง") กับอำเภอที่พิกัดตกอยู่จริง */
+function ampMismatch(s,L){
+  const m=String(s.location||'').match(/อ\.\s*([^\s]+)/);if(!m||!L||!L.amp)return'';
+  const t=m[1].replace(/\s/g,''),a=L.amp.replace(/^กิ่งอำเภอ/,'').replace(/\s/g,'');
+  return(a.indexOf(t)>=0||t.indexOf(a)>=0)?'':t;
+}
+const ampTxt=a=>/^กิ่งอำเภอ/.test(a)?a:'อ.'+a;
+function stFlag(s){
+  const la=parseFloat(s.lat),lo=parseFloat(s.lon);
+  if(!isFinite(la)||!isFinite(lo))return'<span class="warn">ยังไม่มีพิกัด</span>';
+  if(la<5||la>25||lo<90||lo>110)return'<span class="bad">พิกัดผิดปกติ (สลับ lat/lon?)</span>';
+  if(la<BOX.lat0||la>BOX.lat1||lo<BOX.lon0||lo>BOX.lon1)return'<span class="warn">อยู่นอกกรอบแผนที่</span>';
+  const L=locate(la,lo);
+  if(!L)return'<span class="ok">อยู่ในกรอบแผนที่</span>';
+  if(!L.prov)return'<span class="warn">พิกัดไม่อยู่ในจังหวัดใดของ shapefile</span>';
+  const where='<br><small>อยู่ใน '+esc(L.amp?ampTxt(L.amp)+' ':'')+'จ.'+esc(L.prov)+'</small>';
+  if(s.province&&s.province!==L.prov)return'<span class="bad">จังหวัดไม่ตรงกับพิกัด</span>'+where;
+  const am=ampMismatch(s,L);
+  if(am)return'<span class="warn">ที่ตั้งระบุ อ.'+esc(am)+' แต่พิกัดอยู่ '+esc(ampTxt(L.amp))+'</span>'+where;
+  return'<span class="ok">พิกัดตรงกับจังหวัด</span>'+where;
+}
+function renderSt(){
+  const provs=[];DB.stations.forEach(s=>{if(s.province&&provs.indexOf(s.province)<0)provs.push(s.province);});
+  $('provlist').innerHTML=provs.map(p=>'<option value="'+esc(p)+'">').join('');
+  $('st-table').innerHTML='<thead><tr><th>#</th><th>ลำดับ</th><th>ชุดข้อมูล</th><th>รหัสสถานี</th><th>ที่ตั้ง</th><th>จังหวัด</th><th>ละติจูด (N)</th><th>ลองจิจูด (E)</th><th>สถานะพิกัด</th><th></th></tr></thead><tbody>'
+   +DB.stations.map((s,i)=>'<tr data-i="'+i+'"><td>'+(i+1)+'</td><td style="white-space:nowrap"><button class="btn s" data-a="up">↑</button> <button class="btn s" data-a="dn">↓</button></td>'
+   +'<td><select data-f="set">'+DB.sets.map(x=>'<option value="'+esc(x.id)+'"'+(x.id===s.set?' selected':'')+'>'+esc(x.label)+'</option>').join('')+'</select></td><td><input data-f="code" value="'+esc(s.code)+'" style="width:90px"></td><td><input data-f="location" value="'+esc(s.location)+'"></td>'
+   +'<td><input data-f="province" list="provlist" value="'+esc(s.province)+'" style="width:140px"></td>'
+   +'<td><input class="num" data-f="lat" value="'+esc(s.lat==null?'':s.lat)+'" inputmode="decimal"></td><td><input class="num" data-f="lon" value="'+esc(s.lon==null?'':s.lon)+'" inputmode="decimal"></td>'
+   +'<td class="fl">'+stFlag(s)+'</td><td><button class="btn s d" data-a="del">ลบ</button></td></tr>').join('')+'</tbody>';
+}
+$('st-table').addEventListener('change',e=>{
+  const inp=e.target;if(!inp.dataset.f)return;const tr=inp.closest('tr'),i=+tr.dataset.i,s=DB.stations[i],f=inp.dataset.f;let v=inp.value.trim();
+  if(f==='code'){
+    if(!v||!/^[A-Za-z0-9_-]+$/.test(v)){alert('รหัสสถานีใช้ได้เฉพาะตัวอักษรอังกฤษ ตัวเลข _ และ - เท่านั้น (ใช้ตั้งชื่อไฟล์ในรีโป)');inp.value=s.code;return;}
+    if(DB.stations.some((x,j)=>j!==i&&x.code===v)){alert('รหัสสถานีซ้ำ');inp.value=s.code;return;}
+    if(DB.daily[s.code]){DB.daily[v]=DB.daily[s.code];delete DB.daily[s.code];}
+    s.code=v;
+  }else if(f==='lat'||f==='lon'){
+    if(v===''){s[f]=null;}else{const n=parseFloat(v);if(!isFinite(n)){alert('กรุณาใส่ตัวเลข');inp.value=s[f]==null?'':s[f];return;}s[f]=n;}
+    if(!s.province){const L=locate(parseFloat(s.lat),parseFloat(s.lon));if(L&&L.prov){s.province=L.prov;touch();renderSt();fillDailySel();return;}}
+    tr.querySelector('.fl').innerHTML=stFlag(s);
+  }else s[f]=v;
+  touch();if(f==='province'||f==='set')renderSt();fillDailySel();
+});
+$('st-table').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b||!b.dataset.a)return;const i=+b.closest('tr').dataset.i,a=b.dataset.a,S=DB.stations;
+  if(a==='up'&&i>0){[S[i-1],S[i]]=[S[i],S[i-1]];}
+  else if(a==='dn'&&i<S.length-1){[S[i+1],S[i]]=[S[i],S[i+1]];}
+  else if(a==='del'){if(!confirm('ลบสถานี '+S[i].code+' และข้อมูลรายวันทั้งหมดของสถานีนี้ ใช่หรือไม่?'))return;delete DB.daily[S[i].code];S.splice(i,1);}
+  else return;
+  touch();renderSt();fillDailySel();
+});
+$('st-add').onclick=()=>{let n=1;while(DB.stations.some(s=>s.code==='new'+n))n++;DB.stations.push({code:'new'+n,set:DB.sets[0].id,location:'',province:'',lat:null,lon:null});touch();renderSt();};
+
+/* ---------- รายวัน ---------- */
+function fillDailySel(){
+  const cs=$('d-st').value,cy=$('d-y').value;
+  $('d-st').innerHTML=DB.sets.map(x=>'<optgroup label="'+esc(x.label)+'">'+DB.stations.filter(s=>s.set===x.id).map(s=>'<option value="'+esc(s.code)+'">'+esc(s.code)+' — '+esc(s.province)+'</option>').join('')+'</optgroup>').join('');
+  if(cs&&DB.stations.some(s=>s.code===cs))$('d-st').value=cs;
+  fillDailyYears(cy);
+}
+function fillDailyYears(cy){
+  const ys=setYears(stationSet($('d-st').value));
+  $('d-y').innerHTML=ys.map(y=>'<option value="'+y+'">'+y+'</option>').join('');
+  if(cy&&ys.indexOf(+cy)>=0)$('d-y').value=cy;else $('d-y').value=ys[ys.length-1];
+}
+function ensureYear(code,y){
+  DB.daily[code]=DB.daily[code]||{};
+  if(!DB.daily[code][y]){const a=[];for(let m=0;m<12;m++)a.push(new Array(dim(y,m+1)).fill(null));DB.daily[code][y]=a;}
+  return DB.daily[code][y];
+}
+function dcls(v){return v==null?'':v>DB.settings.th?'o2':v>DB.settings.who?'o1':'';}
+function renderDaily(){
+  const code=$('d-st').value,y=+$('d-y').value;if(!code){$('d-grid').innerHTML='<p class="note">ยังไม่มีสถานี</p>';return;}
+  const yd=(DB.daily[code]||{})[y];
+  let h='<table class="g"><thead><tr><th>วันที่</th>'+MS.map(m=>'<th>'+m+'</th>').join('')+'</tr></thead><tbody>';
+  for(let d=0;d<31;d++){
+    h+='<tr><th>'+(d+1)+'</th>';
+    for(let m=0;m<12;m++){
+      if(d>=dim(y,m+1)){h+='<td class="na"></td>';continue;}
+      const v=yd&&yd[m]?yd[m][d]:null;
+      h+='<td><input data-m="'+m+'" data-d="'+d+'" value="'+(v==null?'':v)+'" class="'+dcls(v)+'" inputmode="decimal"></td>';
+    }
+    h+='</tr>';
+  }
+  h+='</tbody><tfoot><tr><th>วันที่มีข้อมูล</th>'+MS.map((_,m)=>'<td data-fn="'+m+'"></td>').join('')+'</tr><tr><th>เฉลี่ย</th>'+MS.map((_,m)=>'<td data-fa="'+m+'"></td>').join('')+'</tr></tfoot></table>';
+  $('d-grid').innerHTML=h;updFoot();
+}
+function updFoot(){
+  const code=$('d-st').value,y=+$('d-y').value,yd=(DB.daily[code]||{})[y];let tot=0;
+  for(let m=0;m<12;m++){let n=0,s=0;if(yd&&yd[m])yd[m].forEach(v=>{if(v!=null){n++;s+=v;}});tot+=n;
+    const a=document.querySelector('[data-fn="'+m+'"]'),b=document.querySelector('[data-fa="'+m+'"]');if(a)a.textContent=n+'/'+dim(y,m+1);if(b)b.textContent=n?(s/n).toFixed(1):'—';}
+  $('d-sum').textContent='รวมมีข้อมูล '+tot+' จาก '+(dim(y,2)===29?366:365)+' วัน';
+}
+function setCell(code,y,m,d,txt,inp){
+  txt=String(txt).trim().replace(',','.');
+  if(txt===''){const yd=(DB.daily[code]||{})[y];if(yd&&yd[m])yd[m][d]=null;if(inp){inp.className='';}return true;}
+  const v=parseFloat(txt);
+  if(!isFinite(v)||v<0||v>2000){if(inp)inp.className='bad';return false;}
+  ensureYear(code,y)[m][d]=Math.round(v*100)/100;
+  if(inp)inp.className=dcls(v);return true;
+}
+$('d-grid').addEventListener('input',e=>{
+  const i=e.target;if(i.dataset.m==null)return;
+  if(setCell($('d-st').value,+$('d-y').value,+i.dataset.m,+i.dataset.d,i.value,i)){touch();updFoot();}
+});
+$('d-grid').addEventListener('paste',e=>{
+  const i=e.target;if(i.dataset.m==null)return;
+  const txt=(e.clipboardData||window.clipboardData).getData('text');if(!/[\n\t]/.test(txt.trim()))return;
+  e.preventDefault();const code=$('d-st').value,y=+$('d-y').value,rows=txt.replace(/\r/g,'').replace(/\n+$/,'').split('\n');
+  let bad=0;
+  rows.forEach((row,ri)=>row.split('\t').forEach((c,ci)=>{
+    const m=+i.dataset.m+ci,d=+i.dataset.d+ri;if(m>11||d>=dim(y,m+1))return;
+    const el=document.querySelector('input[data-m="'+m+'"][data-d="'+d+'"]');
+    if(setCell(code,y,m,d,c,el)){if(el)el.value=c.trim().replace(',','.');}else bad++;
+  }));
+  touch();updFoot();if(bad)alert('มี '+bad+' ช่องที่ค่าไม่ถูกต้อง (ต้องเป็นตัวเลข 0–2000) จึงไม่ถูกบันทึก');
+});
+$('d-st').onchange=()=>{fillDailyYears($('d-y').value);renderDaily();};$('d-y').onchange=renderDaily;
+$('d-clear').onclick=()=>{const code=$('d-st').value,y=$('d-y').value;if(!confirm('ลบข้อมูลทั้งปี '+y+' ของสถานี '+code+' ใช่หรือไม่?'))return;if(DB.daily[code])delete DB.daily[code][y];touch();renderDaily();};
+
+/* ---------- ความครบถ้วน ---------- */
+function renderCov(){
+  let h='';
+  DB.sets.forEach(x=>{
+    const ys=setYears(x.id);
+    h+='<thead><tr><th colspan="'+(ys.length+2)+'" style="background:#d8e6ec">ชุดข้อมูล: '+esc(x.label)+' ('+esc(x.sub||'')+')</th></tr><tr><th>สถานี</th><th>จังหวัด</th>'+ys.map(y=>'<th>'+y+'</th>').join('')+'</tr></thead><tbody>';
+    DB.stations.filter(s=>s.set===x.id).forEach(s=>{
+      h+='<tr><th>'+esc(s.code)+'</th><td>'+esc(s.province)+'</td>';
+      ys.forEach(y=>{
+        let n=0;((DB.daily[s.code]||{})[y]||[]).forEach(a=>a.forEach(v=>{if(v!=null)n++;}));
+        const tot=dim(y,2)===29?366:365,r=n/tot;
+        const bg=!n?'#eceff2':r>=.9?'#cfeedd':r>=.75?'#fbf0b8':'#fddcb6';
+        h+='<td data-s="'+esc(s.code)+'" data-y="'+y+'" style="background:'+bg+'" title="'+n+'/'+tot+' วัน">'+(n||'')+'</td>';
+      });
+      h+='</tr>';
+    });
+    h+='</tbody>';
+  });
+  $('cov-table').innerHTML=h;
+}
+$('cov-table').addEventListener('click',e=>{const td=e.target.closest('td[data-s]');if(!td)return;go('daily');$('d-st').value=td.dataset.s;fillDailyYears(td.dataset.y);renderDaily();});
+
+/* =========================================================
+   นำเข้าไฟล์ดิบ (Excel / CSV)
+   ========================================================= */
+let m_=0;
+function parseDate(s){
+  s=String(s).trim();let m,y,d;
+  if((m=s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/))){y=+m[1];m_=+m[2];d=+m[3];}
+  else if((m=s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/))){d=+m[1];m_=+m[2];y=+m[3];}
+  else return null;
+  if(y>2400)y-=543;
+  if(m_<1||m_>12||d<1||d>dim(y,m_))return null;
+  return{y,m:m_-1,d:d-1};
+}
+const normCode=s=>String(s==null?'':s).replace(/[\s\u00a0]+/g,'');
+const lc=s=>String(s==null?'':s).trim().toLowerCase();
+const pad2=n=>String(n).padStart(2,'0');
+const fmtYMD=t=>t.y+'-'+pad2(t.m+1)+'-'+pad2(t.d+1);
+function toYMD(v){
+  if(v instanceof Date&&!isNaN(v))return{y:v.getFullYear(),m:v.getMonth(),d:v.getDate()-1};
+  if(typeof v==='number'&&v>20000&&v<80000){const d=new Date(Math.round((v-25569)*86400000));return{y:d.getUTCFullYear(),m:d.getUTCMonth(),d:d.getUTCDate()-1};}
+  if(typeof v==='string')return parseDate(v);
+  return null;
+}
+const dbCodeMap=()=>{const o={};DB.stations.forEach(s=>{o[s.code.toLowerCase()]=s.code;});return o;};
+const stripPM=n=>normCode(n).replace(/^PM2\.5[_\- ]*/i,'');
+function sheetAOA(ws,limit){
+  const ref=ws['!ref'];if(!ref)return[];const rg=XLSX.utils.decode_range(ref);
+  if(limit&&rg.e.r>limit-1){rg.e.r=limit-1;ws['!ref']=XLSX.utils.encode_range(rg);}
+  const a=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});ws['!ref']=ref;return a;
+}
+const VALH=['pm2.5','pm25','value','ค่า'];
+function detectSheet(R,codes){
+  if(!R||R.length<2)return null;
+  const h=(R[0]||[]).map(lc);
+  if(h.indexOf('year')>=0&&(h.indexOf('smoke_avg')>=0||h.indexOf('annual_avg')>=0||h.indexOf('non_smoke_avg')>=0))return'roni';
+  if(h.indexOf('latitude')>=0&&h.some(x=>/^long(t|i)/.test(x)))return'stations';
+  if(h[0]==='date'&&typeof R[0][1]==='number'&&R[0][1]>=1980&&R[0][1]<=2100&&R[1]&&R[1].indexOf(1)>=0&&R[1].indexOf(12)>=0)return'matrix';
+  const di=h.findIndex(x=>x==='date'||x==='วันที่');
+  if(di>=0){
+    if(h.some((x,i)=>i!==di&&codes[normCode(x).toLowerCase()]))return'wide';
+    if(h.some(x=>VALH.indexOf(x)>=0))return'long';
+  }
+  return null;
+}
+function parseMatrix(code,R){
+  const recs=[],warn=[];let cur=null;const yrs=[],mos=[];
+  for(let c=1;c<(R[0]||[]).length;c++){
+    if(typeof R[0][c]==='number'){
+      let y=R[0][c];
+      if(cur!=null&&y<=cur){warn.push('คอลัมน์ '+XLSX.utils.encode_col(c)+' ระบุปี '+y+' ซ้ำ/ย้อนกลับจากบล็อกก่อนหน้า (ปี '+cur+') จึงตีความเป็นปี '+(cur+1)+' — ตรวจว่าป้ายปีในไฟล์ต้นฉบับพิมพ์ผิดหรือไม่');y=cur+1;}
+      cur=y;
+    }
+    yrs[c]=cur;
+  }
+  for(let c=1;c<(R[1]||[]).length;c++)mos[c]=typeof R[1][c]==='number'?R[1][c]:null;
+  let bad=0,nonnum=0;
+  for(let r=2;r<Math.min(R.length,45);r++){
+    const row=R[r];if(!row)continue;const day=row[0];
+    if(typeof day!=='number'||day<1||day>31||day%1)continue;
+    for(let c=1;c<row.length;c++){
+      const v=row[c];if(v==null||v==='')continue;
+      const y=yrs[c],mo=mos[c];if(!y||!mo||mo<1||mo>12)continue;
+      if(typeof v!=='number'){nonnum++;continue;}
+      if(!(v>=0&&v<=2000)||day>dim(y,mo)){bad++;continue;}
+      recs.push([code,y,mo-1,day-1,v]);
+    }
+  }
+  return{recs,bad,nonnum,warn};
+}
+function parseWide(R,codes){
+  const h=R[0].map(lc),di=h.findIndex(x=>x==='date'||x==='วันที่'),cols=[],unknown=[];
+  h.forEach((x,i)=>{if(i===di||x==='')return;const c=codes[normCode(x).toLowerCase()];if(c)cols.push([i,c]);else if(['summary','id','no','n','#'].indexOf(x)<0&&!/sample/.test(x))unknown.push(String(R[0][i]));});
+  const recs=[];let badDate=0,bad=0;
+  for(let r=1;r<R.length;r++){const row=R[r];if(!row)continue;const raw=row[di],dt=toYMD(raw);
+    if(dt==null){if(raw!=null&&raw!=='')badDate++;continue;}
+    cols.forEach(([i,c])=>{const v=row[i];if(v==null||v==='')return;if(typeof v!=='number'||!(v>=0&&v<=2000)){bad++;return;}recs.push([c,dt.y,dt.m,dt.d,v]);});}
+  return{recs,badDate,bad,unknown,codes:cols.map(x=>x[1])};
+}
+function parseLong(sheetName,R,codes){
+  const h=R[0].map(lc),di=h.findIndex(x=>x==='date'||x==='วันที่'),vi=h.findIndex(x=>VALH.indexOf(x)>=0),ci=h.findIndex(x=>x==='code'||x==='station'||x==='สถานี');
+  const nameCode=codes[stripPM(sheetName).toLowerCase()];
+  const recs=[],warn=[],unknown={};let badDate=0,bad=0,prev=null;
+  for(let r=1;r<R.length;r++){const row=R[r];if(!row)continue;const raw=row[di],dt=toYMD(raw);
+    if(dt==null){if(raw!=null&&raw!=='')badDate++;continue;}
+    const code=ci>=0?codes[normCode(row[ci]).toLowerCase()]:nameCode;
+    if(!code){unknown[ci>=0?String(row[ci]):sheetName]=1;continue;}
+    const v=row[vi];if(v==null||v==='')continue;
+    if(typeof v!=='number'||!(v>=0&&v<=2000)){bad++;continue;}
+    const key=dt.y*10000+dt.m*100+dt.d;
+    if(ci<0&&prev!=null&&key<prev&&warn.length<5)warn.push('แถวที่ '+(r+1)+': วันที่ '+fmtYMD(dt)+' ย้อนกลับจากแถวก่อนหน้า (อาจพิมพ์วันที่ผิด)');
+    prev=key;recs.push([code,dt.y,dt.m,dt.d,v]);}
+  return{recs,badDate,bad,warn,unknown:Object.keys(unknown),codes:[...new Set(recs.map(x=>x[0]))]};
+}
+function parseStations(R){
+  const h=R[0].map(lc),li=h.findIndex(x=>x.indexOf('location')>=0||x==='ที่ตั้ง'),pi=h.findIndex(x=>x==='province'||x==='จังหวัด'),la=h.indexOf('latitude'),lo=h.findIndex(x=>/^long(t|i)/.test(x));
+  const rows=[],bad=[];
+  for(let r=1;r<R.length;r++){const row=R[r];if(!row||row[0]==null||normCode(row[0])==='')continue;
+    const code=normCode(row[0]),lat=parseFloat(row[la]),lon=parseFloat(row[lo]);
+    if(!/^[A-Za-z0-9_-]+$/.test(code)){bad.push(code+' (รหัสมีอักขระที่ใช้ไม่ได้)');continue;}
+    if(!isFinite(lat)||!isFinite(lon)){bad.push(code+' (พิกัดไม่ใช่ตัวเลข)');continue;}
+    rows.push({code,location:li>=0?String(row[li]==null?'':row[li]).replace(/\u00a0/g,' ').trim():'',province:pi>=0?String(row[pi]==null?'':row[pi]).replace(/[\s\u00a0]+/g,''):'',lat,lon});}
+  return{rows,bad};
+}
+function parseRoni(R){
+  const h=R[0].map(lc),yi=h.indexOf('year'),grp={smoke:['smoke_avg','smoke_type','smoke_category'],non:['non_smoke_avg','non_smoke_type','non_smoke_category'],ann:['annual_avg','annual_type','annual_category']};
+  const rows=[];
+  for(let r=1;r<R.length;r++){const row=R[r];if(!row)continue;const y=parseInt(row[yi]);if(!isFinite(y))continue;const o={};
+    Object.keys(grp).forEach(k=>{const vi=h.indexOf(grp[k][0]);if(vi<0)return;const v=parseFloat(row[vi]);if(!isFinite(v))return;const c=roniCls(v),t=h.indexOf(grp[k][1]),ct=h.indexOf(grp[k][2]);
+      o[k]={v,type:(t>=0&&row[t])?String(row[t]).trim():c.type,cat:(ct>=0&&row[ct])?String(row[ct]).trim():c.cat};});
+    if(Object.keys(o).length)rows.push({y,o});}
+  return rows;
+}
+const KIND_TH={matrix:'ตารางรายสถานี (ปี/เดือนเป็นคอลัมน์)',wide:'ตารางวันที่ × สถานี',long:'รายการวันที่–ค่า',stations:'พิกัดสถานี',roni:'ค่า RONI',unknown:'ไม่รู้จัก'};
+let RAW=[];
+function readFile(f){return new Promise((res,rej)=>{const r=new FileReader(),isText=/\.(csv|txt)$/i.test(f.name);r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);if(isText)r.readAsText(f,'utf-8');else r.readAsArrayBuffer(f);});}
+function warnsOf(p){const w=[];if(p.badDate)w.push('วันที่อ่านไม่ได้ '+p.badDate+' แถว (ข้าม)');if(p.bad)w.push('ค่าที่ไม่ใช่ตัวเลข/ติดลบ/เกิน 2000/วันที่ไม่มีจริง '+p.bad+' ค่า (ข้าม)');if(p.nonnum)w.push('ช่องที่เป็นข้อความ (เช่น n/a) '+p.nonnum+' ช่อง — ถือว่าไม่มีข้อมูล');if(p.unknown&&p.unknown.length)w.push('คอลัมน์/รหัสที่ไม่รู้จัก: '+p.unknown.join(', ')+' (ข้าม)');(p.warn||[]).forEach(x=>w.push(x));return w;}
+async function loadRaw(files){
+  if(!window.XLSX){$('r-log').textContent='ไม่พบไลบรารีอ่าน Excel (lib/xlsx.full.min.js) — ต้องมีโฟลเดอร์ lib/ อยู่ข้างไฟล์ admin.html';return;}
+  RAW=[];const codes=dbCodeMap();let id=0;$('r-log').textContent='กำลังอ่านไฟล์…';
+  for(const f of files){
+    try{
+      const data=await readFile(f),isText=typeof data==='string';
+      const wb=XLSX.read(data,{type:isText?'string':'array'});const items=[];
+      wb.SheetNames.forEach(name=>{
+        const ws=wb.Sheets[name],head=sheetAOA(ws,60),kind=detectSheet(head,codes);
+        const base={id:id++,file:f.name,sheet:isText?'(CSV)':name,kind:kind||'unknown',checked:true,warn:[]};
+        if(!kind){items.push(Object.assign(base,{checked:false,warn:['ไม่รู้จักโครงสร้างของชีตนี้ — ข้าม']}));return;}
+        if(kind==='matrix'){
+          const raw=stripPM(name),code=codes[raw.toLowerCase()];
+          if(!code){items.push(Object.assign(base,{target:raw,checked:false,recs:[],warn:['ยังไม่มีสถานี "'+raw+'" ในระบบ — ข้าม (เพิ่มสถานีก่อนที่แท็บ "สถานีและพิกัด" หรือนำเข้าไฟล์พิกัด)']}));return;}
+          const p=parseMatrix(code,sheetAOA(ws,45));items.push(Object.assign(base,{target:code,recs:p.recs,warn:warnsOf(p)}));return;
+        }
+        const R=sheetAOA(ws);
+        if(kind==='wide'){const p=parseWide(R,codes);items.push(Object.assign(base,{target:p.codes.join(', '),recs:p.recs,warn:warnsOf(p)}));}
+        else if(kind==='long'){const p=parseLong(name,R,codes);items.push(Object.assign(base,{target:p.codes.join(', ')||'—',recs:p.recs,warn:warnsOf(p),checked:p.recs.length>0}));}
+        else if(kind==='stations'){const p=parseStations(R);items.push(Object.assign(base,{target:p.rows.length+' สถานี',stRows:p.rows,warn:p.bad.length?['ข้ามแถวที่ใช้ไม่ได้: '+p.bad.join(', ')]:[]}));}
+        else if(kind==='roni'){const rows=parseRoni(R);items.push(Object.assign(base,{target:rows.length+' ปี',roniRows:rows}));}
+      });
+      if(items.some(x=>x.kind==='wide'))items.forEach(x=>{if(x.kind==='long'&&x.checked){x.checked=false;x.warn.push('ไม่ติ๊กให้ เพราะไฟล์นี้มีชีตแบบรวม (วันที่ × สถานี) ที่มีข้อมูลชุดเดียวกันอยู่แล้ว — ใช้ชีตรวมจะไม่ซ้ำและมักถูกตรวจแก้วันที่แล้ว');}});
+      items.forEach(x=>RAW.push(x));
+    }catch(err){RAW.push({id:id++,file:f.name,sheet:'',kind:'unknown',checked:false,warn:['อ่านไฟล์ไม่สำเร็จ: '+err.message]});}
+  }
+  renderRaw();$('r-log').textContent='อ่านไฟล์แล้ว '+RAW.length+' ชีต — ตรวจรายการด้านบน ติ๊กเฉพาะที่ต้องการ แล้วกด "ยืนยันนำเข้า"';
+}
+const curVal=(code,y,m,d)=>{const a=(DB.daily[code]||{})[y];return a&&a[m]&&a[m][d]!=null?a[m][d]:null;};
+function dailyStats(it){
+  const mode=$('r-mode').value,ext=$('r-ext').value==='extend',by={},seen={};
+  it.recs.forEach(([code,y,m,d,v])=>{
+    const s=by[code]=by[code]||{nw:0,ch:0,same:0,skip:0,clr:0,years:new Set(),skipYears:new Set()};
+    const yy=setOf(stationSet(code)).years;
+    if(!ext&&(y<yy[0]||y>yy[1])){s.skip++;s.skipYears.add(y);return;}
+    s.years.add(y);const cur=curVal(code,y,m,d);
+    if(cur==null)s.nw++;else{if(Math.abs(cur-v)<=0.0051)s.same++;else s.ch++;seen[code+'|'+y]=(seen[code+'|'+y]||0)+1;}
+  });
+  if(mode==='replace')Object.keys(by).forEach(code=>{by[code].years.forEach(y=>{const a=(DB.daily[code]||{})[y];let e=0;if(a)a.forEach(x=>x.forEach(v=>{if(v!=null)e++;}));by[code].clr+=Math.max(0,e-(seen[code+'|'+y]||0));});});
+  return by;
+}
+function stationStats(it){
+  let add=0,upd=0,same=0;const names=[];
+  it.stRows.forEach(r=>{const s=DB.stations.find(x=>x.code.toLowerCase()===r.code.toLowerCase());
+    if(!s){add++;names.push('+'+r.code);return;}
+    const chg=Math.abs((+s.lat||0)-r.lat)>1e-6||Math.abs((+s.lon||0)-r.lon)>1e-6||(r.location&&r.location!==s.location)||(r.province&&r.province!==s.province);
+    if(chg){upd++;names.push('~'+r.code);}else same++;});
+  return{add,upd,same,names};
+}
+function renderRaw(){
+  const mode=$('r-mode').value;
+  if(!RAW.length){$('r-list').innerHTML='';$('r-apply').disabled=true;return;}
+  $('r-list').innerHTML='<div class="wrap" style="max-height:55vh"><table class="t"><thead><tr><th></th><th>ไฟล์ / ชีต</th><th>ชนิดที่ตรวจพบ</th><th>ปลายทาง</th><th>ผลที่จะเกิดขึ้น</th></tr></thead><tbody>'+RAW.map((it,i)=>{
+    let res='';
+    if(it.recs&&it.recs.length){const by=dailyStats(it);const ks=Object.keys(by);
+      res=ks.slice(0,10).map(c=>{const s=by[c],ys=[...s.years].sort();
+        return'<div><b>'+esc(c)+'</b>: ใหม่ '+s.nw+' · '+(mode==='add'?'ข้าม (มีค่าเดิม) '+s.ch:'เปลี่ยนค่า '+s.ch)+' · เหมือนเดิม '+s.same+(ys.length?' <small>(ปี '+ys[0]+(ys.length>1?'–'+ys[ys.length-1]:'')+')</small>':'')
+          +(s.skip?' · <span class="warn">ข้ามนอกช่วงปี '+s.skip+' ค่า (ปี '+[...s.skipYears].sort().join(', ')+')</span>':'')+(mode==='replace'&&s.clr?' · <span class="bad">ลบค่าที่ไฟล์ไม่มี '+s.clr+'</span>':'')+'</div>';}).join('')+(ks.length>10?'<div>… และอีก '+(ks.length-10)+' สถานี</div>':'');}
+    else if(it.recs)res='<span class="warn">ไม่พบค่าที่นำเข้าได้</span>';
+    else if(it.stRows){const s=stationStats(it);res='เพิ่มสถานีใหม่ '+s.add+' · อัปเดตข้อมูล '+s.upd+' · เหมือนเดิม '+s.same+(s.names.length?' <small>('+esc(s.names.slice(0,8).join(' ')+')')+'</small>':'');}
+    else if(it.roniRows){res='ค่า RONI '+it.roniRows.length+' ปี ('+it.roniRows[0].y+'–'+it.roniRows[it.roniRows.length-1].y+') จะเขียนทับปีที่ซ้ำ';}
+    const w=it.warn.length?'<div class="warn" style="margin-top:3px"><small>⚠ '+it.warn.map(esc).join('<br>⚠ ')+'</small></div>':'';
+    return'<tr><td><input type="checkbox" data-ri="'+i+'"'+(it.checked?' checked':'')+(it.kind==='unknown'||it.unknownStation?' disabled':'')+'></td><td>'+esc(it.file)+'<br><small>'+esc(it.sheet)+'</small></td><td>'+esc(KIND_TH[it.kind]||it.kind)+'</td><td>'+esc(it.target||'—')+'</td><td>'+res+w+'</td></tr>';
+  }).join('')+'</tbody></table></div>';
+  $('r-apply').disabled=!RAW.some(x=>x.checked);
+}
+$('r-list').addEventListener('change',e=>{const i=e.target.dataset.ri;if(i==null)return;RAW[+i].checked=e.target.checked;$('r-apply').disabled=!RAW.some(x=>x.checked);});
+['r-mode','r-ext'].forEach(id=>$(id).addEventListener('change',renderRaw));
+$('r-file').addEventListener('change',e=>{const fs=[...e.target.files];if(fs.length)loadRaw(fs);});
+function applyRaw(){
+  const mode=$('r-mode').value,ext=$('r-ext').value==='extend',tset=$('r-set').value;
+  const sel=RAW.filter(x=>x.checked);if(!sel.length)return;
+  const tot={nw:0,ch:0,same:0,skip:0,clr:0,add:0,upd:0,roni:0};const touched=new Set();
+  sel.forEach(it=>{
+    if(it.recs){
+      const st=dailyStats(it);Object.keys(st).forEach(c=>{['nw','ch','same','skip','clr'].forEach(k=>tot[k]+=st[c][k]);});
+      const done={};
+      it.recs.forEach(([code,y,m,d,v])=>{
+        const yy=setOf(stationSet(code)).years;
+        if(y<yy[0]||y>yy[1]){if(!ext)return;if(y<yy[0])yy[0]=y;if(y>yy[1])yy[1]=y;}
+        if(mode==='replace'&&!done[code+'|'+y]){done[code+'|'+y]=1;const a=(DB.daily[code]||{})[y];if(a)a.forEach(x=>{for(let i=0;i<x.length;i++)x[i]=null;});}
+        const arr=ensureYear(code,y),nv=Math.round(v*100)/100,cur=arr[m][d];
+        if(cur==null||mode==='replace')arr[m][d]=nv;else if(mode==='merge'&&Math.abs(cur-v)>0.0051)arr[m][d]=nv;
+        touched.add(code);
+      });
+    }else if(it.stRows){
+      it.stRows.forEach(r=>{
+        const s=DB.stations.find(x=>x.code.toLowerCase()===r.code.toLowerCase());
+        if(s){const chg=Math.abs((+s.lat||0)-r.lat)>1e-6||Math.abs((+s.lon||0)-r.lon)>1e-6||(r.location&&r.location!==s.location)||(r.province&&r.province!==s.province);
+          if(r.location)s.location=r.location;if(r.province)s.province=r.province;s.lat=r.lat;s.lon=r.lon;if(chg)tot.upd++;}
+        else{const L=locate(r.lat,r.lon);DB.stations.push({code:r.code,set:tset,location:r.location||(L&&L.amp?('อ.'+L.amp.replace(/^กิ่งอำเภอ/,'')):''),province:r.province||(L&&L.prov)||'',lat:r.lat,lon:r.lon});tot.add++;}
+      });
+    }else if(it.roniRows){it.roniRows.forEach(r=>{DB.roni[r.y]=Object.assign(DB.roni[r.y]||{},r.o);tot.roni++;});}
+  });
+  touch();fillDailySel();
+  const parts=[];
+  if(touched.size||tot.nw||tot.ch||tot.same||tot.skip)parts.push('ข้อมูลรายวัน: เพิ่มใหม่ '+tot.nw+' · '+(mode==='add'?'ข้าม (มีค่าเดิม) '+tot.ch:'เปลี่ยนค่า '+tot.ch)+' · เหมือนเดิม '+tot.same+(tot.skip?' · ข้ามนอกช่วงปี '+tot.skip:'')+(tot.clr?' · ลบค่าที่ไฟล์ไม่มี '+tot.clr:'')+(touched.size?' (สถานี '+[...touched].join(', ')+')':''));
+  if(tot.add||tot.upd)parts.push('สถานี: เพิ่มใหม่ '+tot.add+' · อัปเดต '+tot.upd);
+  if(tot.roni)parts.push('RONI: '+tot.roni+' ปี');
+  RAW=[];$('r-list').innerHTML='';$('r-apply').disabled=true;$('r-file').value='';
+  $('r-log').textContent='นำเข้าเสร็จแล้ว (บันทึกเป็นฉบับร่างในเบราว์เซอร์)\n'+parts.join('\n')+'\n\nขั้นต่อไป: ตรวจที่แท็บ "ค่าฝุ่นรายวัน"/"ความครบถ้วน" แล้วไปแท็บ GitHub เพื่อบันทึกขึ้นเว็บ';
+  renderIo();
+}
+$('r-apply').onclick=applyRaw;
+/* ส่งออกเป็นไฟล์ Excel รูปแบบเดิม */
+function exportMatrix(){
+  if(!window.XLSX){alert('ไม่พบไลบรารี Excel (lib/xlsx.full.min.js)');return;}
+  const wb=XLSX.utils.book_new();
+  DB.stations.forEach(s=>{
+    const ys=setYears(s.set),aoa=[],r0=['Date'],r1=[null];
+    ys.forEach(y=>{for(let m=0;m<12;m++){r0.push(m===0?y:null);r1.push(m+1);}});aoa.push(r0,r1);
+    for(let d=0;d<31;d++){const row=[d+1];ys.forEach(y=>{const a=(DB.daily[s.code]||{})[y];for(let m=0;m<12;m++)row.push(d<dim(y,m+1)&&a&&a[m]&&a[m][d]!=null?a[m][d]:null);});aoa.push(row);}
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),('PM2.5_'+s.code).slice(0,31));
+  });
+  XLSX.writeFile(wb,'pm25_daily_by_station_'+today()+'.xlsx');
+}
+function exportRoniCsv(){
+  const rows=[['year','smoke_avg','smoke_type','smoke_category','non_smoke_avg','non_smoke_type','non_smoke_category','annual_avg','annual_type','annual_category']];
+  Object.keys(DB.roni).sort().forEach(y=>{const r=DB.roni[y],g=k=>r[k]?[r[k].v,r[k].type,r[k].cat]:['','',''];rows.push([y].concat(g('smoke'),g('non'),g('ann')));});
+  dlCSV(rows,'enso_config.csv');
+}
+$('x-xlsx').onclick=exportMatrix;$('x-roni').onclick=exportRoniCsv;
+/* ลบข้อมูลตามช่วงวันที่ */
+$('d-del').onclick=()=>{
+  const code=$('d-st').value,f=$('d-from').value,t=$('d-to').value;
+  if(!code){alert('ยังไม่มีสถานี');return;}
+  const a=toYMD(f),b=toYMD(t);if(!a||!b){alert('เลือกวันที่เริ่มต้นและสิ้นสุดให้ครบ');return;}
+  const d1=new Date(a.y,a.m,a.d+1),d2=new Date(b.y,b.m,b.d+1);if(d1>d2){alert('วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด');return;}
+  let n=0;for(let x=new Date(d1);x<=d2;x.setDate(x.getDate()+1)){if(curVal(code,x.getFullYear(),x.getMonth(),x.getDate()-1)!=null)n++;}
+  if(!n){alert('ไม่มีข้อมูลในช่วงวันที่นี้');return;}
+  if(!confirm('ลบค่ารายวัน '+n+' ค่า ของสถานี '+code+' ตั้งแต่ '+f+' ถึง '+t+' ใช่หรือไม่?'))return;
+  for(let x=new Date(d1);x<=d2;x.setDate(x.getDate()+1)){const arr=(DB.daily[code]||{})[x.getFullYear()];if(arr&&arr[x.getMonth()])arr[x.getMonth()][x.getDate()-1]=null;}
+  touch();renderDaily();alert('ลบแล้ว '+n+' ค่า');
+};
+function renderIo(){
+  const cur=$('r-set').value;$('r-set').innerHTML=DB.sets.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.label)+'</option>').join('');if(cur&&DB.sets.some(x=>x.id===cur))$('r-set').value=cur;
+  const p=problems();
+  $('x-check').innerHTML=p.length?'<ul style="margin:6px 0;padding-left:20px">'+p.map(x=>'<li class="'+x[0]+'">'+esc(x[1])+'</li>').join('')+'</ul>':'<p class="ok">ไม่พบปัญหา พร้อมเผยแพร่</p>';
+}
+
+/* ---------- ตั้งค่า + RONI ---------- */
+function roniCls(v){
+  const cat=v>0.5?'El Nino':v<-0.5?'La Nina':'Neutral';if(cat==='Neutral')return{cat,type:'Neutral'};
+  const a=Math.abs(Math.round(v*10)/10),s=a<1?'Weak':a<1.5?'Moderate':a<2?'Strong':'Very Strong';return{cat,type:s+' '+cat};
+}
+function roniCls(v){
+  const cat=v>0.5?'El Nino':v<-0.5?'La Nina':'Neutral';if(cat==='Neutral')return{cat,type:'Neutral'};
+  const a=Math.abs(Math.round(v*10)/10),st=a<1?'Weak':a<1.5?'Moderate':a<2?'Strong':'Very Strong';return{cat,type:st+' '+cat};
+}
+const SEAS=[['smoke','ฤดูหมอกควัน'],['non','นอกฤดูหมอกควัน'],['ann','ทั้งปี']];
+function renderSet(){
+  $('s-title').value=DB.meta.title||'';$('s-th').value=DB.settings.th;$('s-who').value=DB.settings.who;
+  $('sets-box').innerHTML=DB.sets.map((x,i)=>'<div class="card" style="background:var(--soft)" data-si="'+i+'"><h2 style="font-size:15px">ชุดข้อมูล: '+esc(x.label)+'</h2><div class="bar">'
+   +'<label>ชื่อ <input data-sf="label" value="'+esc(x.label)+'" style="width:130px"></label><label>คำอธิบายสั้น <input data-sf="sub" value="'+esc(x.sub||'')+'" style="width:170px"></label>'
+   +'<label>ช่วงปี <input data-sf="y0" type="number" value="'+x.years[0]+'" style="width:84px"> ถึง <input data-sf="y1" type="number" value="'+x.years[1]+'" style="width:84px"></label>'
+   +'<label>เกณฑ์ข้อมูลครบเริ่มต้น <select data-sf="minCoverage">'+[['0','มีข้อมูลก็แสดง'],['0.5','≥ 50%'],['0.75','≥ 75%'],['0.9','≥ 90%']].map(o=>'<option value="'+o[0]+'"'+(+o[0]===+x.minCoverage?' selected':'')+'>'+o[1]+'</option>').join('')+'</select></label>'
+   +'<label><input type="checkbox" data-sf="sampled"'+(x.sampled?' checked':'')+'> ข้อมูลตัวอย่างไม่ครบทุกวัน</label></div>'
+   +'<div class="bar"><label>แหล่งข้อมูล <input data-sf="source" value="'+esc(x.source||'')+'" style="width:520px;max-width:100%"></label></div>'
+   +'<div class="bar"><label style="width:100%">หมายเหตุที่แสดงบนหน้าบ้าน <input data-sf="note" value="'+esc(x.note||'')+'" style="width:100%"></label></div>'
+   +'<div class="bar"><span class="note">รหัสชุด: <b>'+esc(x.id)+'</b> · มี '+DB.stations.filter(s=>s.set===x.id).length+' สถานี</span><button class="btn s d" data-sdel="'+i+'">ลบชุดข้อมูลนี้</button></div></div>').join('');
+  const ys=unionYears();
+  $('r-table').innerHTML='<thead><tr><th>ปี</th>'+SEAS.map(a=>'<th>'+a[1]+'</th>').join('')+'</tr></thead><tbody>'+ys.map(y=>{const r=DB.roni[y]||{};
+    return'<tr><td>'+y+'</td>'+SEAS.map(a=>{const v=r[a[0]];return'<td><input class="num" data-ry="'+y+'" data-rs="'+a[0]+'" value="'+(v?v.v:'')+'" inputmode="decimal" style="width:90px"> <span class="note" data-rt="'+y+'-'+a[0]+'">'+(v?esc(v.type):'')+'</span></td>';}).join('')+'</tr>';}).join('')+'</tbody>';
+}
+[['s-title',v=>DB.meta.title=v]].forEach(a=>$(a[0]).addEventListener('change',e=>{a[1](e.target.value);touch();}));
+[['s-th','th'],['s-who','who']].forEach(a=>$(a[0]).addEventListener('change',e=>{const v=parseFloat(e.target.value);if(!isFinite(v)||v<=0){alert('ใส่ตัวเลขที่มากกว่า 0');e.target.value=DB.settings[a[1]];return;}DB.settings[a[1]]=v;touch();}));
+$('sets-box').addEventListener('click',e=>{
+  const b=e.target.closest('[data-sdel]');if(!b)return;const i=+b.dataset.sdel,x=DB.sets[i];
+  if(DB.stations.some(s=>s.set===x.id)){alert('ลบไม่ได้: ชุดนี้ยังมีสถานีอยู่ ย้ายหรือลบสถานีออกจากชุดนี้ก่อน');return;}
+  if(DB.sets.length<2){alert('ต้องมีอย่างน้อย 1 ชุดข้อมูล');return;}
+  if(!confirm('ลบชุดข้อมูล "'+x.label+'" ใช่หรือไม่?'))return;DB.sets.splice(i,1);touch();renderSet();fillDailySel();
+});
+$('set-add').onclick=()=>{
+  const id=(prompt('รหัสชุดข้อมูลใหม่ (ตัวอักษรอังกฤษ/ตัวเลข เช่น s4)')||'').trim();if(!id)return;
+  if(!/^[A-Za-z0-9_-]+$/.test(id)||DB.sets.some(x=>x.id===id)){alert('รหัสไม่ถูกต้องหรือซ้ำกับที่มีอยู่');return;}
+  const label=(prompt('ชื่อที่แสดงบนปุ่ม (เช่น 5 สถานี)')||id).trim(),y=new Date().getFullYear();
+  DB.sets.push({id,label,sub:'',years:[y,y],minCoverage:0.75,sampled:false,source:'',note:''});touch();renderSet();fillDailySel();
+};
+$('sets-box').addEventListener('change',e=>{
+  const el=e.target,f=el.dataset.sf;if(!f)return;const i=+el.closest('[data-si]').dataset.si,x=DB.sets[i];
+  if(f==='y0'||f==='y1'){
+    const card=el.closest('[data-si]'),a=parseInt(card.querySelector('[data-sf="y0"]').value),b=parseInt(card.querySelector('[data-sf="y1"]').value);
+    if(!isFinite(a)||!isFinite(b)||a>b||a<1990||b>2100){alert('ช่วงปีไม่ถูกต้อง');renderSet();return;}
+    x.years=[a,b];fillDailySel();
+  }else if(f==='minCoverage')x.minCoverage=+el.value;
+  else if(f==='sampled')x.sampled=el.checked;
+  else x[f]=el.value;
+  touch();if(f==='y0'||f==='y1')renderSet();
+});
+$('r-table').addEventListener('change',e=>{
+  const y=e.target.dataset.ry,k=e.target.dataset.rs;if(!y)return;const t=e.target.value.trim().replace(',','.');
+  DB.roni[y]=DB.roni[y]||{};
+  if(t===''){delete DB.roni[y][k];}
+  else{const v=parseFloat(t);if(!isFinite(v)||Math.abs(v)>5){alert('ใส่ตัวเลข RONI (เช่น 0.675)');e.target.value=DB.roni[y][k]?DB.roni[y][k].v:'';return;}const c=roniCls(v);DB.roni[y][k]={v,type:c.type,cat:c.cat};}
+  const sp=document.querySelector('[data-rt="'+y+'-'+k+'"]');if(sp)sp.textContent=DB.roni[y][k]?DB.roni[y][k].type:'';
+  touch();
+});
+
+
+/* =========================================================
+   GitHub: ดึง / บันทึก (commit) ไฟล์ในโฟลเดอร์ data/
+   ========================================================= */
+const GH_API=window.PM25_GH_API||'https://api.github.com';
+const GHK='pm25_gh_cfg',GHT='pm25_gh_token';
+let BASE={},EXTRA={},GH_INIT=false,CHG=[];
+const enc=p=>p.split('/').map(encodeURIComponent).join('/');
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+function pruneDaily(d){const o={};Object.keys(d||{}).forEach(y=>{if(d[y]&&d[y].some(a=>a.some(v=>v!=null)))o[y]=d[y];});return o;}
+const numOrNull=v=>v===''||v==null||!isFinite(parseFloat(v))?null:+v;
+function serialize(db){
+  const f={};
+  const cfg={meta:db.meta,settings:db.settings,sets:db.sets,
+    stations:db.stations.map(s=>({code:s.code,set:s.set,location:s.location,province:s.province,lat:numOrNull(s.lat),lon:numOrNull(s.lon)})),roni:db.roni};
+  f['config.js']='window.PM25_CFG='+JSON.stringify(cfg,null,1)+';\n';
+  db.stations.forEach(s=>{const d=pruneDaily(db.daily[s.code]);if(Object.keys(d).length)f['daily/'+s.code+'.js']='window.PM25_DAILY=window.PM25_DAILY||{};window.PM25_DAILY['+JSON.stringify(s.code)+']='+JSON.stringify(d)+';\n';});
+  return f;
+}
+BASE=serialize(REPO_DB);
+function parseCfg(t){const i=t.indexOf('=');if(i<0)throw new Error('รูปแบบ config.js ไม่ถูกต้อง');return JSON.parse(t.slice(i+1).trim().replace(/;\s*$/,''));}
+function parseDaily(t){const m=t.match(/PM25_DAILY\[[^\]]*\]\s*=\s*([\s\S]*?);\s*$/);if(!m)throw new Error('รูปแบบไฟล์รายวันไม่ถูกต้อง');return JSON.parse(m[1]);}
+const logTo=(id,m)=>{$(id).textContent=m;};
+function ghGet(){return{owner:$('g-owner').value.trim(),repo:$('g-repo').value.trim(),branch:$('g-branch').value.trim()||'main',root:$('g-root').value.trim().replace(/^\/+|\/+$/g,''),token:$('g-token').value.trim()};}
+const rp=(c,rel)=>(c.root?c.root+'/':'')+'data/'+rel;
+function ghSaveFields(){
+  const c=ghGet();
+  try{localStorage.setItem(GHK,JSON.stringify({owner:c.owner,repo:c.repo,branch:c.branch,root:c.root}));}catch(e){}
+  try{sessionStorage.setItem(GHT,c.token);if($('g-remember').checked)localStorage.setItem(GHT,c.token);else localStorage.removeItem(GHT);}catch(e){}
+}
+function ghLoadFields(){
+  let c={};try{c=JSON.parse(localStorage.getItem(GHK)||'{}');}catch(e){}
+  if(!c.owner){const h=location.hostname;if(/\.github\.io$/.test(h)){c.owner=h.split('.')[0];const seg=location.pathname.split('/').filter(Boolean);c.repo=(seg.length&&!/\.html?$/.test(seg[0]))?seg[0]:h;}}
+  $('g-owner').value=c.owner||'';$('g-repo').value=c.repo||'';$('g-branch').value=c.branch||'main';$('g-root').value=c.root||'';
+  let t='',rem='';try{rem=localStorage.getItem(GHT)||'';t=rem||sessionStorage.getItem(GHT)||'';}catch(e){}
+  $('g-token').value=t;$('g-remember').checked=!!rem;
+}
+async function ghReq(c,path,opt){
+  opt=opt||{};
+  const r=await fetch(GH_API+path,{method:opt.method||'GET',headers:Object.assign({'Accept':'application/vnd.github+json'},c.token?{'Authorization':'Bearer '+c.token}:{},opt.body?{'Content-Type':'application/json'}:{},opt.headers||{}),body:opt.body});
+  if(!r.ok){let t='';try{t=await r.text();}catch(e){}
+    const hint=r.status===401?' (token ไม่ถูกต้องหรือหมดอายุ)':r.status===403?' (ไม่มีสิทธิ์ หรือเกินโควตาการเรียก API)':r.status===404?' (ไม่พบรีโป/branch/ไฟล์ หรือ token ไม่มีสิทธิ์เข้าถึงรีโปนี้)':r.status===422?' (ข้อมูลที่ส่งไม่ถูกต้อง)':'';
+    const e=new Error('GitHub '+r.status+hint+(t?' — '+t.slice(0,140):''));e.status=r.status;throw e;}
+  return r;
+}
+function ghCheckFields(c,needToken){
+  if(!c.owner||!c.repo)throw new Error('กรอกเจ้าของรีโปและชื่อรีโปก่อน');
+  if(needToken&&!c.token)throw new Error('ต้องใส่ token ก่อน');
+}
+async function ghTest(){
+  const c=ghGet();ghSaveFields();
+  try{ghCheckFields(c,false);logTo('g-log','กำลังตรวจสอบ…');
+    const repo=await(await ghReq(c,'/repos/'+c.owner+'/'+c.repo)).json();
+    const ref=await(await ghReq(c,'/repos/'+c.owner+'/'+c.repo+'/git/ref/heads/'+enc(c.branch))).json();
+    let cfgOk='พบ';try{await ghReq(c,'/repos/'+c.owner+'/'+c.repo+'/contents/'+enc(rp(c,'config.js'))+'?ref='+encodeURIComponent(c.branch),{headers:{'Accept':'application/vnd.github.raw+json'}});}catch(e){cfgOk='ไม่พบ ('+e.message.slice(0,60)+')';}
+    const push=repo.permissions?(repo.permissions.push?'เขียนได้':'อ่านอย่างเดียว (token ไม่มีสิทธิ์เขียน)'):'ไม่ทราบ (ยังไม่ได้ใส่ token)';
+    logTo('g-log','เชื่อมต่อสำเร็จ\nรีโป: '+repo.full_name+(repo.private?' (Private)':' (Public)')+'\nbranch '+c.branch+': '+ref.object.sha.slice(0,7)+'\nสิทธิ์ของ token: '+push+'\nไฟล์ '+rp(c,'config.js')+': '+cfgOk);
+  }catch(e){logTo('g-log','ผิดพลาด: '+e.message);}
+}
+async function ghRaw(c,rel){
+  try{const r=await ghReq(c,'/repos/'+c.owner+'/'+c.repo+'/contents/'+enc(rp(c,rel))+'?ref='+encodeURIComponent(c.branch),{headers:{'Accept':'application/vnd.github.raw+json'}});return await r.text();}
+  catch(e){if(e.status===404)return null;throw e;}
+}
+async function ghPull(){
+  const c=ghGet();ghSaveFields();
+  try{ghCheckFields(c,false);
+    if(computeChanges().length&&!confirm('มีการแก้ไขที่ยังไม่ได้บันทึกขึ้น GitHub การดึงข้อมูลล่าสุดจะแทนที่การแก้ไขเหล่านั้น ดำเนินการต่อหรือไม่?'))return;
+    logTo('g-log','กำลังดึง config.js …');
+    const t=await ghRaw(c,'config.js');if(t==null)throw new Error('ไม่พบ '+rp(c,'config.js')+' ในรีโป');
+    const cfg=parseCfg(t),daily={};let n=0;
+    for(const s of cfg.stations||[]){logTo('g-log','กำลังดึงข้อมูลสถานี '+s.code+' ('+(++n)+'/'+cfg.stations.length+') …');const d=await ghRaw(c,'daily/'+s.code+'.js');if(d!=null)daily[s.code]=parseDaily(d);}
+    DB=Object.assign({},cfg,{daily});normalize();BASE=serialize(DB);EXTRA={};REPO_DB=clone(DB);
+    try{localStorage.removeItem(KEY);}catch(e){}
+    published=true;SRC='GitHub ('+c.owner+'/'+c.repo+')';status('ดึงข้อมูลล่าสุดแล้ว '+new Date().toLocaleTimeString('th-TH'));
+    fillDailySel();logTo('g-log','ดึงข้อมูลล่าสุดสำเร็จ: '+DB.stations.length+' สถานี จาก '+c.owner+'/'+c.repo+'@'+c.branch);renderGh();
+  }catch(e){logTo('g-log','ผิดพลาด: '+e.message);}
+}
+function computeChanges(){
+  const cur=serialize(DB),ch=[];
+  Object.keys(cur).forEach(p=>{if(BASE[p]!==cur[p])ch.push({path:p,content:cur[p],kind:BASE[p]==null?'เพิ่มไฟล์ใหม่':'แก้ไข'});});
+  Object.keys(BASE).forEach(p=>{if(!(p in cur))ch.push({path:p,content:null,kind:'ลบไฟล์'});});
+  Object.keys(EXTRA).forEach(p=>ch.push({path:p,content:EXTRA[p],kind:'แทนที่ (ขอบเขตแผนที่)'}));
+  return ch;
+}
+const fmtSize=n=>n<1024?n+' B':(n/1024).toFixed(1)+' KB';
+function renderGh(){
+  if(!GH_INIT){ghLoadFields();GH_INIT=true;}
+  CHG=computeChanges();
+  const pr=problems().filter(x=>x[0]==='bad');
+  $('g-changes').innerHTML=(pr.length?'<p class="bad">ต้องแก้ก่อนบันทึก: '+pr.map(x=>esc(x[1])).join(' · ')+'</p>':'')
+   +(CHG.length?'<div class="wrap" style="max-height:40vh"><table class="t"><thead><tr><th>ไฟล์</th><th>การเปลี่ยนแปลง</th><th>ขนาด</th><th></th></tr></thead><tbody>'
+     +CHG.map((c,i)=>'<tr><td>data/'+esc(c.path)+'</td><td>'+c.kind+'</td><td>'+(c.content==null?'—':fmtSize(c.content.length))+'</td><td>'+(c.content==null?'':'<button class="btn s" data-dl="'+i+'">ดาวน์โหลด</button>')+'</td></tr>').join('')+'</tbody></table></div>'
+     :'<p class="ok">ไม่มีไฟล์ที่ต่างจากที่โหลดมาจากรีโป (ยังไม่มีอะไรต้องบันทึก)</p>');
+}
+$('g-changes').addEventListener('click',e=>{const b=e.target.closest('[data-dl]');if(!b)return;const c=CHG[+b.dataset.dl];if(c&&c.content!=null)dl(new Blob([c.content],{type:'text/javascript'}),c.path.split('/').pop());});
+async function ghCommit(){
+  const c=ghGet();ghSaveFields();
+  try{
+    ghCheckFields(c,true);
+    const bad=problems().filter(x=>x[0]==='bad');if(bad.length)throw new Error('ต้องแก้ก่อน: '+bad.map(x=>x[1]).join(' · '));
+    let ch=computeChanges();if(!ch.length){logTo('g-clog','ไม่มีไฟล์ที่เปลี่ยน');return;}
+    DB.meta.updated=today();ch=computeChanges();
+    const msg=$('g-msg').value.trim()||'อัปเดตข้อมูล PM2.5';
+    if(!confirm('จะ commit '+ch.length+' ไฟล์ไปที่ '+c.owner+'/'+c.repo+' (branch '+c.branch+')\n'+ch.slice(0,12).map(x=>'• data/'+x.path+' — '+x.kind).join('\n')+(ch.length>12?'\n… และอีก '+(ch.length-12)+' ไฟล์':'')+'\n\nดำเนินการต่อหรือไม่?'))return;
+    const base='/repos/'+c.owner+'/'+c.repo;
+    logTo('g-clog','กำลังอ่าน branch …');
+    const ref=await(await ghReq(c,base+'/git/ref/heads/'+enc(c.branch))).json(),head=ref.object.sha;
+    const commit=await(await ghReq(c,base+'/git/commits/'+head)).json();
+    logTo('g-clog','กำลังสร้าง commit ('+ch.length+' ไฟล์) …');
+    const tree=await(await ghReq(c,base+'/git/trees',{method:'POST',body:JSON.stringify({base_tree:commit.tree.sha,tree:ch.map(x=>x.content==null?{path:rp(c,x.path),mode:'100644',type:'blob',sha:null}:{path:rp(c,x.path),mode:'100644',type:'blob',content:x.content})})})).json();
+    const nc=await(await ghReq(c,base+'/git/commits',{method:'POST',body:JSON.stringify({message:msg,tree:tree.sha,parents:[head]})})).json();
+    await ghReq(c,base+'/git/refs/heads/'+enc(c.branch),{method:'PATCH',body:JSON.stringify({sha:nc.sha})});
+    BASE=serialize(DB);EXTRA={};REPO_DB=clone(DB);try{localStorage.removeItem(KEY);}catch(e){}
+    published=true;SRC='GitHub ('+c.owner+'/'+c.repo+')';status('บันทึกขึ้น GitHub แล้ว');
+    logTo('g-clog','สำเร็จ ✓ commit '+nc.sha.slice(0,7)+(nc.html_url?'\n'+nc.html_url:'')+'\nเว็บบน GitHub Pages จะอัปเดตภายใน 1–2 นาที (ถ้ายังเห็นข้อมูลเดิมให้กด Ctrl+F5)');
+    renderGh();
+  }catch(e){logTo('g-clog','ผิดพลาด: '+e.message);}
+}
+$('g-test').onclick=ghTest;$('g-pull').onclick=ghPull;$('g-commit').onclick=ghCommit;
+['g-owner','g-repo','g-branch','g-root','g-token','g-remember'].forEach(id=>$(id).addEventListener('change',ghSaveFields));
+$('g-geo').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{
+    const t=String(r.result);if(!/^\s*window\.GEO\s*=/.test(t))throw new Error('ไฟล์ต้องขึ้นต้นด้วย window.GEO= (สร้างจาก tools/build_geo.py)');
+    const o=JSON.parse(t.slice(t.indexOf('=')+1).trim().replace(/;\s*$/,''));
+    if(!o.proj||!Array.isArray(o.provinces)||!o.provinces.length)throw new Error('โครงสร้างไฟล์ไม่ถูกต้อง (ไม่พบ proj/provinces)');
+    EXTRA['geo.js']=t;logTo('g-glog','เตรียมแทนที่ geo.js แล้ว: '+o.provinces.length+' จังหวัด, '+o.provinces.reduce((a,p)=>a+p.amphoes.length,0)+' อำเภอ, '+(o.countries||[]).length+' ประเทศ ('+fmtSize(t.length)+')\nกด commit ในหัวข้อ 2 เพื่อบันทึกขึ้น GitHub');renderGh();
+  }catch(err){logTo('g-glog','ใช้ไฟล์นี้ไม่ได้: '+err.message);}};
+  r.readAsText(f,'utf-8');e.target.value='';
+});
+$('g-geo-clear').onclick=()=>{delete EXTRA['geo.js'];logTo('g-glog','ยกเลิกแล้ว');renderGh();};
+
+fillDailySel();status();go('st');
+};
+</script>
+<script>
+/* ตัวโหลดข้อมูลจากโฟลเดอร์ data/ */
+(function(){
+  var T='?t='+Math.floor(Date.now()/60000);
+  var el=function(i){return document.getElementById(i);};
+  function load(src,cb){var s=document.createElement('script');s.src=src+T;s.onload=function(){cb(true);};s.onerror=function(){cb(false);};document.head.appendChild(s);}
+  function run(){try{window.__startAdmin();}catch(e){var b=el('err');b.style.display='block';b.textContent='เกิดข้อผิดพลาด: '+e.message;}}
+  var pend=2;
+  function afterCfg(){
+    if(--pend>0)return;
+    window.PM25_DAILY=window.PM25_DAILY||{};
+    var codes=((window.PM25_CFG||{}).stations||[]).map(function(s){return s.code;}),left=codes.length;
+    if(!left)return run();
+    codes.forEach(function(c){load('data/daily/'+encodeURIComponent(c)+'.js',function(){if(--left===0)run();});});
+  }
+  load('data/config.js',afterCfg);load('data/geo.js',afterCfg);
+})();
+</script>
+</body>
+</html>

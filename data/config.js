@@ -1,7 +1,7 @@
 window.PM25_CFG={
  "meta": {
   "title": "PM2.5 ภาคเหนือตอนบน",
-  "updated": "2026-10-30"
+  "updated": "2026-11-02"
  },
  "settings": {
   "th": 37.5,
@@ -118,8 +118,8 @@ window.PM25_CFG={
    "set": "k11",
    "location": "ต. บ้านกลาง อ. เมือง",
    "province": "ลำพูน",
-   "lat": 18.059,
-   "lon": 99.057,
+   "lat": 18.5668,
+   "lon": 99.0384,
    "rep": true
   },
   {
@@ -136,8 +136,8 @@ window.PM25_CFG={
    "set": "k11",
    "location": "ต. ในเวียง อ. เมือง",
    "province": "น่าน",
-   "lat": 18.782,
-   "lon": 100.786,
+   "lat": 18.7881,
+   "lon": 100.7755,
    "rep": true
   },
   {

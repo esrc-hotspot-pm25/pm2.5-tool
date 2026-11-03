@@ -1,7 +1,7 @@
 window.PM25_CFG={
  "meta": {
   "title": "PM2.5 ภาคเหนือตอนบน",
-  "updated": "2026-11-02"
+  "updated": "2026-11-03"
  },
  "settings": {
   "th": 37.5,
@@ -22,7 +22,7 @@ window.PM25_CFG={
    "sub": "กรมควบคุมมลพิษ",
    "years": [
     2012,
-    2025
+    2026
    ],
    "minCoverage": 0.75,
    "sampled": false,

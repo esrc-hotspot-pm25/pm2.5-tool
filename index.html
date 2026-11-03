@@ -759,12 +759,12 @@ function chartMulti(key,o){
   const cw=W-L-R,X=i=>L+cw*(i+.5)/N,Y=v=>f.T+ch-(v/top)*ch;
   let s=axes(st,{L,T:f.T,cw,ch,ticks:nt.ticks,Y,tickFmt:tickF(o.met)});
   if(o.std){[[TH,st.thc],[WHO,st.whoc]].forEach(a=>{if(a[0]<=top){const y=Y(a[0]).toFixed(1);s+='<line x1="'+L+'" x2="'+(L+cw)+'" y1="'+y+'" y2="'+y+'" stroke="'+a[1]+'" stroke-width="2.6" stroke-dasharray="8 5"/>';}});}
-  const step=N>20?2:1;
+  const step=N>16?Math.ceil(N/13):1;
   o.xl.forEach((lb,i)=>{if(i%step===0){s+=T_(st,X(i).toFixed(1),f.T+ch+19,lb,{anchor:'middle',sz:N>12?10.5:12});if(st.frame)s+='<line x1="'+X(i).toFixed(1)+'" x2="'+X(i).toFixed(1)+'" y1="'+(f.T+ch)+'" y2="'+(f.T+ch-5)+'" stroke="'+st.axis+'"/>';}});
   lines.forEach((sr,si)=>{
     let d='',pen=false;sr.vals.forEach((v,i)=>{if(v==null){pen=false;return;}d+=(pen?'L':'M')+X(i).toFixed(1)+','+Y(v).toFixed(1);pen=true;});
     if(d)s+='<path d="'+d+'" fill="none" stroke="'+sr.color+'" stroke-width="'+(sr.thick?st.lw+1:(sr.dash?1.5:st.lw))+'"'+(sr.dash?' stroke-dasharray="'+sr.dash+'"':'')+' stroke-linejoin="round" stroke-linecap="round" opacity="'+(sr.dash?.85:1)+'"/>';
-    if(N<=16||st.shapes)sr.vals.forEach((v,i)=>{if(v==null)return;s+=mark(st.shapes?(sr.shape||0):0,X(i).toFixed(1),Y(v).toFixed(1),N>16?2.6:(sr.dash?3:st.pr-1),sr.dash?'#fff':sr.color,sr.dash?sr.color:'#fff',sr.dash?1.3:1.2);});
+    if(N<=60)sr.vals.forEach((v,i)=>{if(v==null)return;s+=mark(st.shapes?(sr.shape||0):0,X(i).toFixed(1),Y(v).toFixed(1),N>16?2.6:(sr.dash?3:st.pr-1),sr.dash?'#fff':sr.color,sr.dash?sr.color:'#fff',sr.dash?1.3:1.2);});
   });
   s+=T_(st,18,f.T+ch/2,o.ylabel,{anchor:'middle',sz:12,rot:1});
   if(o.xtitle)s+=T_(st,L+cw/2,f.T+ch+42,o.xtitle,{anchor:'middle',sz:12});
@@ -959,6 +959,9 @@ function periodOpts(p){
       note:'รายวัน: ตารางแสดงทีละเดือนตามแท็บด้านบน (เลื่อนไปเดือนอื่นได้) แต่ปุ่ม "ส่งออก CSV" จะส่งออกทุกเดือนที่เลือกรวมเป็นไฟล์เดียว · ค่ารายจังหวัด = เฉลี่ยของสถานีในจังหวัดที่มีข้อมูลวันนั้น'+(DS.sampled?' · ชุดนี้เก็บตัวอย่างไม่ครบทุกวัน':''),
       xtitle:'วันที่',std:dt==='val',ylabel:dt==='val'?base.ylabel:(dt==='th'?'เกินมาตรฐานไทย (1 = เกิน)':'เกิน WHO (1 = เกิน)'),
       fname:'pm25_daily_'+y+'_'+dt+'.csv'});
+    {const fr=[];sel.forEach(m=>{for(let i=0;i<dim(y,m+1);i++)fr.push({key:{m,d:i},label:(i+1)+' '+MF[m],short:(i+1)+' '+MS[m],full:y+'-'+String(m+1).padStart(2,'0')+'-'+String(i+1).padStart(2,'0')});});
+      const frows=fr.filter(r=>ENT.some(c=>dv(c,r.key.m,r.key.d)!=null));
+      o.figO=Object.assign({},o,{rows:frows,cell:(r,c)=>pick(dv(c,r.key.m,r.key.d)),corner:'วันที่',xtitle:'วันที่ (ทุกเดือนที่เลือก)',ylabel:dt==='val'?'PM2.5 รายวัน (µg/m³)':base.ylabel,title:'ความเข้มข้นรายวัน '+(sel.length?monthsLabel(sel)+' ':'')+y+' · '+frows.length+' วัน'});}
     o.pager={months:sel,cur:PGI};
     if(ENT.some(e=>e.type==='gr'))o.note+=' · คอลัมน์กลุ่มจังหวัด = ค่าเฉลี่ยของจังหวัดที่มีข้อมูลในวันนั้น ('+groupStationsTxt()+')';
     o.csv=()=>{const rows2=[['วันที่'].concat(colHead())];sel.forEach(m=>{for(let d=0;d<dim(y,m+1);d++){rows2.push([y+'-'+String(m+1).padStart(2,'0')+'-'+String(d+1).padStart(2,'0')].concat(ENT.map(c=>{const v=pick(dv(c,m,d));return v==null?'':(dt==='val'?+v.toFixed(2):v);})));}});return rows2;};
@@ -1013,7 +1016,7 @@ function renderConc(){
   $('c-legend').innerHTML='<b style="margin-right:6px">'+esc(concO.title)+'</b>'+legendPM();
   $('c-pager').innerHTML=mode==='day'?pagerHTML(concO):'';
   $('c-table').innerHTML=tbl(concO);$('c-note').textContent=concO.note;
-  figFromOpts('c','c-fig',concO,$('c-fl').value);
+  figFromOpts('c','c-fig',concO.figO||concO,$('c-fl').value);
 }
 function renderExc(){
   const mode=$('e-mode').value;

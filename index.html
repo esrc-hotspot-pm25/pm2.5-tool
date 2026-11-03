@@ -299,7 +299,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 22px 30px;font-size:12.5px;color
   <nav class="subnav" id="cmp-nav" aria-label="หัวข้อเทียบสถานี">
     <button data-sub="a" class="on"><b>เทียบ 3 สถานี</b><small>ค่าที่ตรงกัน · สูงสุด–ต่ำสุด</small></button>
     <button data-sub="b"><b>จุดความร้อนเทียบกับ 3 สถานี</b><small>แท่งจุดความร้อน · เส้น PM2.5</small></button>
-    <button data-sub="c"><b>3 สถานีเทียบกับสถานี คพ.</b><small>เชียงใหม่ 36t · 35t / ลำพูน 68t · o73</small></button>
+    <button data-sub="c"><b>3 สถานีเทียบกับสถานี คพ.</b><small>เชียงใหม่ 36t · 35t / ลำพูน 68t / ลี้ o73</small></button>
   </nav>
   <div class="subbody">
 <div id="cmp-a">
@@ -330,7 +330,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 22px 30px;font-size:12.5px;color
 <div id="cmp-c" style="display:none">
   <div class="card">
     <h2>3 สถานีเทียบกับสถานี คพ.</h2>
-    <p class="note" style="margin:4px 0 0">เชียงใหม่: CM เทียบ 36t และ 35t · ลำพูน: LP, LI เทียบ 68t และ o73</p>
+    <p class="note" style="margin:4px 0 0">เชียงใหม่: CM เทียบ 36t และ 35t · ลำพูน: LP เทียบ 68t · ลี้: LI เทียบ o73</p>
     <div class="bar" style="margin-top:8px">
       <label>ข้อมูลที่ใช้ <select id="pc-mode"><option value="all">ทั้งหมด</option><option value="match">วันที่มีค่าครบทุกสถานีในกราฟ</option></select></label>
       <button class="btn" id="pc-csv">ส่งออก CSV รายวัน</button>
@@ -1414,7 +1414,7 @@ function renderPcd(){
   const body=$('pc-body'),y=Y1,PD=window.PM25_DAILY||{};
   /* ข้อมูลสถานี คพ. อ่านจากไฟล์ข้อมูลรายวันปกติ (data/daily/<รหัส>.js) ที่อัปเดตผ่านหลังบ้าน */
   const pdv=(c,m,d)=>{const a=PD[c]&&PD[c][y]&&PD[c][y][m];return a&&a[d]!=null?a[d]:null;};
-  const GR=[{prov:'เชียงใหม่',ours:['CM'],pcd:['36t','35t']},{prov:'ลำพูน',ours:['LP','LI'],pcd:['68t','o73']}];
+  const GR=[{prov:'เชียงใหม่',name:'จ.เชียงใหม่ (อ.เมือง)',ours:['CM'],pcd:['36t','35t']},{prov:'ลำพูน',name:'จ.ลำพูน (อ.เมือง)',ours:['LP'],pcd:['68t']},{prov:'ลำพูน',name:'อ.ลี้ จ.ลำพูน',ours:['LI'],pcd:['o73']}];
   const pn=c=>{const a=PD[c]&&PD[c][y];let n=0;if(a)a.forEach(mo=>mo.forEach(v=>{if(v!=null)n++;}));return n;};
   const hasAny=GR.some(g=>g.pcd.some(c=>pn(c)>0));
   pcRows=[];
@@ -1433,12 +1433,12 @@ function renderPcd(){
       if(!vals.some(v=>v!=null))continue;
       if(mode==='match'&&!vals.every(v=>v!=null))continue;
       rows.push({y,m,d,vals});}}
-    h+='<h3 class="sec">'+esc(g.prov)+' — '+defs.map(f=>esc(f.code)).join(' · ')+'</h3>';
+    h+='<h3 class="sec">'+esc(g.name)+' — '+defs.map(f=>esc(f.code)).join(' · ')+'</h3>';
     const missing=g.pcd.filter(c=>!pn(c));
     if(missing.length)h+='<p class="note">ยังไม่มีข้อมูล: '+missing.map(esc).join(', ')+' (ใส่ใน data/pcd2026.js)</p>';
     if(!rows.length){h+='<p class="note">ไม่มีวันที่เข้าเงื่อนไข</p>';return;}
     const key='pc'+gi;
-    const fr=chartMulti(key,{title:'PM2.5 รายวัน จ.'+g.prov+' — สถานีของเรา เทียบกับสถานี คพ. ปี '+y,sub:rows.length+' วัน · '+(mode==='match'?'เฉพาะวันที่มีค่าครบทุกสถานี':'ทุกวันที่มีข้อมูล'),notes:['แหล่งข้อมูล: '+DS.source+' และกรมควบคุมมลพิษ','เส้นทึบสี = สถานีของเรา · เส้นประสีเทา/ดำ = สถานี คพ.'],xl:rows.map(r=>(r.d+1)+' '+MS[r.m]),xfull:rows.map(r=>dIso(r.y,r.m,r.d)),xhead:'วันที่',series:defs.map((f,i)=>({label:f.label,color:f.color,dash:f.dash,shape:f.shape,vals:rows.map(r=>r.vals[i])})),met:'avg',ylabel:'PM2.5 รายวัน (µg/m³)',xtitle:'วันที่',dots:true,name:'pm25_vs_pcd_'+g.prov+'_'+y});
+    const fr=chartMulti(key,{title:'PM2.5 รายวัน '+g.name+' — สถานีของเรา เทียบกับสถานี คพ. ปี '+y,sub:rows.length+' วัน · '+(mode==='match'?'เฉพาะวันที่มีค่าครบทุกสถานี':'ทุกวันที่มีข้อมูล'),notes:['แหล่งข้อมูล: '+DS.source+' และกรมควบคุมมลพิษ','เส้นทึบสี = สถานีของเรา · เส้นประสีเทา/ดำ = สถานี คพ.'],xl:rows.map(r=>(r.d+1)+' '+MS[r.m]),xfull:rows.map(r=>dIso(r.y,r.m,r.d)),xhead:'วันที่',series:defs.map((f,i)=>({label:f.label,color:f.color,dash:f.dash,shape:f.shape,vals:rows.map(r=>r.vals[i])})),met:'avg',ylabel:'PM2.5 รายวัน (µg/m³)',xtitle:'วันที่',dots:true,name:'pm25_vs_pcd_'+g.ours.join('-')+'_'+y});
     FIGS[key]={csv:fr.csv,name:fr.name};
     h+='<div class="figure">'+fr.svg+'</div><div style="margin-top:8px">'+toolbarHTML(key)+'</div>';
     /* ตารางเทียบคู่ */

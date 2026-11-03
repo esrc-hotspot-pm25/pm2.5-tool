@@ -172,6 +172,10 @@ footer{max-width:1440px;margin:0 auto;padding:0 22px 30px;font-size:12.5px;color
 .zoomctl{position:absolute;top:12px;right:14px;z-index:5;display:flex;flex-direction:column;gap:6px}
 .zoomctl .btn{font-size:18px!important;font-weight:700;padding:0!important}
 #mapsvg{touch-action:none;cursor:grab}#mapsvg.drag{cursor:grabbing}
+.ti{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-left:5px;font-size:11px;line-height:1;border:1px solid var(--line2);border-radius:50%;color:var(--mute);cursor:help;vertical-align:middle;font-style:normal;font-weight:400;font-family:'CMU',sans-serif}
+.ti:hover,.ti:focus{color:var(--acc);border-color:var(--acc);outline:none}
+.xtag{display:inline-block;border-radius:999px;padding:0 9px;font-size:12px;border:1px solid var(--line2)}
+.xtag.a{background:color-mix(in srgb,#B08900 18%,var(--panel))}.xtag.b{background:color-mix(in srgb,#A8201A 16%,var(--panel))}
 </style>
 <link rel="stylesheet" href="cmu-theme.css">
 </head>
@@ -189,7 +193,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 22px 30px;font-size:12.5px;color
 <div class="tabsbar">
   <nav id="tabs"></nav>
   <div class="tabtools">
-    <label>เกณฑ์ข้อมูลครบ
+    <label><span id="cov-t">เกณฑ์ข้อมูลครบ</span>
       <select id="cov"><option value="0">มีข้อมูลก็แสดง</option><option value="0.5">≥ 50% ของวัน</option><option value="0.75">≥ 75% ของวัน</option><option value="0.9">≥ 90% ของวัน</option></select>
     </label>
     <a class="btn" href="admin.html">Admin Panel</a>
@@ -285,10 +289,21 @@ footer{max-width:1440px;margin:0 auto;padding:0 22px 30px;font-size:12.5px;color
     <div class="bar" style="margin-top:8px">
       <label>ปี <select id="x-y"></select></label>
       <label>ช่วงของปี <select id="x-sea"></select></label>
-      <label>ถือว่า "ใกล้เคียงกัน" เมื่อต่างกันไม่เกิน <select id="x-tol"><option value="3">3 µg/m³</option><option value="5" selected>5 µg/m³</option><option value="10">10 µg/m³</option></select></label>
+      <label>ข้อมูลที่ใช้ <select id="x-mode"><option value="all">ทั้งหมด</option><option value="match">วันที่ตรงกันทุกสถานี</option></select></label>
       <button class="btn" id="x-csv">ส่งออก CSV รายวัน</button>
     </div>
     <div id="x-body"></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h2>จุดความร้อนเทียบกับ PM2.5</h2>
+    <div class="bar" style="margin-top:8px">
+      <label>ดาวเทียม <select id="hp-sat"><option value="all">MODIS + VIIRs</option><option value="MODIS">MODIS</option><option value="VIIRS">VIIRs</option></select></label>
+      <button class="btn" id="hp-tcsv">ส่งออก CSV ตาราง</button>
+    </div>
+    <div class="figure" id="hp-fig"></div>
+    <div class="figtb" data-key="hp"></div>
+    <h3 class="sec">ค่าจุดความร้อนและ PM2.5 รายเดือน</h3>
+    <div id="hp-table"></div>
   </div>
 </section>
 
@@ -1142,85 +1157,187 @@ function renderTr(){
    ========================================================= */
 
 /* =========================================================
-   หน้า: เทียบสถานี
+   หน้า: เทียบสถานี (เฉพาะชุด 3 สถานี)
    ========================================================= */
-let cmpRows=[];
+let cmpRows=[],cmpMon='all',hpT=null;
 const dTxt=(y,m,d)=>(d+1)+' '+MS[m]+' '+y;
 const dIso=(y,m,d)=>y+'-'+String(m+1).padStart(2,'0')+'-'+String(d+1).padStart(2,'0');
-function pearson(a,b){const n=a.length;if(n<3)return null;let sa=0,sb=0;for(let i=0;i<n;i++){sa+=a[i];sb+=b[i];}const ma=sa/n,mb=sb/n;let c=0,va=0,vb=0;for(let i=0;i<n;i++){c+=(a[i]-ma)*(b[i]-mb);va+=(a[i]-ma)**2;vb+=(b[i]-mb)**2;}return va>0&&vb>0?c/Math.sqrt(va*vb):null;}
 const pct=(a,b)=>b?(100*a/b).toFixed(0)+'%':'—';
+const tipI=t=>'<span class="ti" tabindex="0" data-tip="'+esc(t)+'">ⓘ</span>';
+document.addEventListener('mouseover',e=>{const t=e.target.closest&&e.target.closest('.ti');if(t)showTip(esc(t.dataset.tip).replace(/\n/g,'<br>'),e.clientX,e.clientY);});
+document.addEventListener('mouseout',e=>{const t=e.target.closest&&e.target.closest('.ti');if(t)hideTip();});
+const sgn=v=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(1);
+const lvTxt=()=>BOUNDS.join(' / ');
+function stCol(s,i){return provColor(s.province);}
+function stDash(codes,i){const p=ST[i].province;return ST.slice(0,i).some(s=>s.province===p)?'6 3':'';}
+function stShape(i){const p=ST[i].province;return ST.slice(0,i).filter(s=>s.province===p).length?3:0;}
+
+/* กราฟความแตกต่างจากค่าเฉลี่ยกลุ่มรายวัน */
+function chartDev(key,o){
+  const st=sty(),W=960,L=74,R=36,ch=300,B=58,N=o.xl.length||1;
+  let mx=1;o.series.forEach(s=>s.vals.forEach(v=>{if(v!=null&&Math.abs(v)>mx)mx=Math.abs(v);}));
+  const nt=niceTicks(mx*1.1),top=nt.top;
+  const ticks=nt.ticks.slice(1).reverse().map(t=>-t).concat(nt.ticks);
+  const items=o.series.map(s=>({k:'mline',c:s.color,d:s.dash,shape:st.shapes?(s.shape||0):0,t:s.label}));
+  const f=frame(st,{W,L,R,B,ch,title:o.title,sub:o.sub,items,notes:o.notes});
+  const cw=W-L-R,X=i=>L+cw*(i+.5)/N,Y=v=>f.T+ch/2-(v/top)*(ch/2);
+  let s=axes(st,{L,T:f.T,cw,ch,ticks,Y,tickFmt:t=>(t>0?'+':t<0?'−':'')+Math.abs(t)});
+  s+='<line x1="'+L+'" x2="'+(L+cw)+'" y1="'+Y(0)+'" y2="'+Y(0)+'" stroke="'+st.axis+'" stroke-width="1.6"/>';
+  const step=Math.max(1,Math.ceil(N/16));
+  o.xl.forEach((lb,i)=>{if(i%step===0)s+=T_(st,X(i).toFixed(1),f.T+ch+19,lb,{anchor:'middle',sz:10.5});});
+  o.series.forEach(sr=>{
+    let d='',pen=false;sr.vals.forEach((v,i)=>{if(v==null){pen=false;return;}d+=(pen?'L':'M')+X(i).toFixed(1)+','+Y(v).toFixed(1);pen=true;});
+    if(d)s+='<path d="'+d+'" fill="none" stroke="'+sr.color+'" stroke-width="'+(sr.dash?1.8:st.lw)+'"'+(sr.dash?' stroke-dasharray="'+sr.dash+'"':'')+' stroke-linejoin="round" stroke-linecap="round"/>';
+    sr.vals.forEach((v,i)=>{if(v==null)return;s+=mark(st.shapes?(sr.shape||0):0,X(i).toFixed(1),Y(v).toFixed(1),N>30?2.4:st.pr-1.4,sr.dash?'#fff':sr.color,sr.dash?sr.color:'#fff',1.2);});
+  });
+  s+=T_(st,18,f.T+ch/2,'ต่างจากค่าเฉลี่ยกลุ่ม (µg/m³)',{anchor:'middle',sz:12,rot:1});
+  s+=T_(st,L+cw/2,f.T+ch+42,'วันที่',{anchor:'middle',sz:12});
+  s+=T_(st,L+6,f.T+14,'▲ สูงกว่าค่าเฉลี่ยกลุ่ม',{sz:11,fill:st.sub})+T_(st,L+6,f.T+ch-6,'▼ ต่ำกว่าค่าเฉลี่ยกลุ่ม',{sz:11,fill:st.sub});
+  if(!o.xl.length)s+=T_(st,W/2,f.T+ch/2,'ไม่มีวันที่ทุกสถานีมีข้อมูลในช่วงนี้',{anchor:'middle',sz:16,fill:'#999'});
+  const csv=[['วันที่'].concat(o.series.map(x=>x.label+' ต่างจากค่าเฉลี่ยกลุ่ม')).concat(o.series.map(x=>x.label+' ค่าจริง'))].concat(o.xl.map((lb,i)=>[o.xfull[i]].concat(o.series.map(x=>x.vals[i]==null?'':+x.vals[i].toFixed(2)),o.raw.map(r=>r[i]==null?'':+r[i].toFixed(2)))));
+  return{svg:wrapSVG(key,W,f,s,''),csv,name:o.name};
+}
+
 function renderCmp(){
   const body=$('x-body');
   if(ST.length<2){body.innerHTML='<p class="note">ชุดข้อมูลนี้มีสถานีเดียว จึงไม่มีอะไรให้เปรียบเทียบ</p>';cmpRows=[];return;}
-  const ysel=$('x-y').value,ys=ysel==='all'?YEARS.slice():[+ysel],ms=seasonArg($('x-sea').value)||ALLM,tol=+$('x-tol').value;
-  const codes=ST.map(s=>s.code),n=codes.length;
-  const stat_=codes.map(()=>({n:0,sum:0,min:null,max:null,over:0,lv:[0,0,0,0,0]}));
+  const ysel=$('x-y').value,ys=ysel==='all'?YEARS.slice():[+ysel],ms=seasonArg($('x-sea').value)||ALLM,mode=$('x-mode').value;
+  const codes=ST.map(s=>s.code),n=codes.length,TOL=5;
   const rows=[];
   ys.forEach(y=>ms.forEach(m=>{const nd=dim(y,m+1);for(let d=0;d<nd;d++){
     const vals=codes.map(c=>{const sr=SER['S:'+c]&&SER['S:'+c][y];return sr&&sr[m]&&sr[m][d]!=null?sr[m][d]:null;});
-    vals.forEach((v,i)=>{if(v==null)return;const t=stat_[i];t.n++;t.sum+=v;t.lv[pmCat(v)]++;if(v>TH)t.over++;
-      if(t.min==null||v<t.min.v)t.min={v,y,m,d};if(t.max==null||v>t.max.v)t.max={v,y,m,d};});
-    if(vals.some(v=>v!=null))rows.push({y,m,d,vals,all:vals.every(v=>v!=null)});
+    if(!vals.some(v=>v!=null))continue;
+    const all=vals.every(v=>v!=null);
+    rows.push({y,m,d,vals,all,same:all&&new Set(vals.map(pmCat)).size===1});
   }}));
-  cmpRows=rows;
-  const both=rows.filter(r=>r.all),N=both.length;
+  const use=mode==='match'?rows.filter(r=>r.same):rows;
+  cmpRows=use;
   const per=(ysel==='all'?'ทุกปี ('+(YEARS[0]===YEARS[YEARS.length-1]?YEARS[0]:YEARS[0]+'–'+YEARS[YEARS.length-1])+')':'ปี '+ysel)+($('x-sea').value==='all'?'':' · '+seasonLabel($('x-sea').value));
-  let h='<p class="note" style="margin:0 0 4px">'+esc(per)+' · '+n+' สถานี · ข้อมูลรายวัน (ใช้ทุกค่าที่มี ไม่ตัดตามเกณฑ์ข้อมูลครบ)</p>';
-  /* 1) สรุปแต่ละสถานี */
-  h+='<h3 class="sec">ค่าสูงสุด–ต่ำสุดของแต่ละสถานี</h3><div class="xcards">'+ST.map((s,i)=>{const t=stat_[i];
-    if(!t.n)return'<div class="xc" style="--pc:'+provColor(s.province)+'"><div class="h"><b>'+esc(s.code)+'</b><span>'+esc(s.province)+'</span></div><p class="note">ไม่มีข้อมูลในช่วงนี้</p></div>';
+  const modeTxt=mode==='match'?'เฉพาะวันที่ตรงกันทุกสถานี ('+rows.filter(r=>r.same).length+' วัน)':'ทุกวันที่มีข้อมูล ('+rows.length+' วัน)';
+  let h='<p class="note" style="margin:0 0 4px">'+esc(per)+' · '+n+' สถานี · ใช้ข้อมูล: <b>'+esc(modeTxt)+'</b> (ใช้ทุกค่าที่มี ไม่ตัดตามเกณฑ์ข้อมูล)</p>';
+  if(!use.length){body.innerHTML=h+'<p class="note">ไม่มีวันที่เข้าเงื่อนไขในช่วงนี้</p>';return;}
+  /* A) สถานี: เฉลี่ย / สูงสุด / ต่ำสุด */
+  const S=codes.map(()=>({n:0,sum:0,min:null,max:null,over:0,lv:[0,0,0,0,0]}));
+  use.forEach(r=>r.vals.forEach((v,i)=>{if(v==null)return;const t=S[i];t.n++;t.sum+=v;t.lv[pmCat(v)]++;if(v>TH)t.over++;if(t.min==null||v<t.min.v)t.min={v,y:r.y,m:r.m,d:r.d};if(t.max==null||v>t.max.v)t.max={v,y:r.y,m:r.m,d:r.d};}));
+  const how=mode==='match'?'เฉพาะวันที่ตรงกันทุกสถานี':'ทุกวันที่สถานีนั้นมีข้อมูล';
+  h+='<h3 class="sec">ค่าสูงสุด–ต่ำสุดของแต่ละสถานี</h3><div class="xcards">'+ST.map((s,i)=>{const t=S[i];
+    if(!t.n)return'<div class="xc" style="--pc:'+stCol(s,i)+'"><div class="h"><b>'+esc(s.code)+'</b><span>'+esc(s.province)+'</span></div><p class="note">ไม่มีข้อมูลในช่วงนี้</p></div>';
     const bar=t.lv.map((c,k)=>c?'<i style="width:'+(100*c/t.n).toFixed(2)+'%;background:'+PMC[k]+'" title="'+c+' วัน"></i>':'').join('');
-    return'<div class="xc" style="--pc:'+provColor(s.province)+'"><div class="h"><b>'+esc(s.code)+'</b><span>'+esc(s.province)+(s.location?' · '+esc(s.location):'')+'</span></div>'
-     +'<div class="m">'+(t.sum/t.n).toFixed(1)+'<small>µg/m³ เฉลี่ย</small></div>'
-     +'<div class="r"><span>▲ สูงสุด</span><span><b>'+t.max.v.toFixed(1)+'</b><em>'+dTxt(t.max.y,t.max.m,t.max.d)+'</em></span></div>'
-     +'<div class="r"><span>▼ ต่ำสุด</span><span><b>'+t.min.v.toFixed(1)+'</b><em>'+dTxt(t.min.y,t.min.m,t.min.d)+'</em></span></div>'
-     +'<div class="r"><span>เกิน '+TH+' µg/m³</span><span><b>'+t.over+'</b><em>จาก '+t.n+' วัน ('+pct(t.over,t.n)+')</em></span></div>'
+    return'<div class="xc" style="--pc:'+stCol(s,i)+'"><div class="h"><b>'+esc(s.code)+'</b><span>'+esc(s.province)+(s.location?' · '+esc(s.location):'')+'</span></div>'
+     +'<div class="m">'+(t.sum/t.n).toFixed(1)+'<small>µg/m³ เฉลี่ย</small>'+tipI('ค่าเฉลี่ยของสถานี '+s.code+'\n1) ใช้ '+how+' = '+t.n+' วัน\n2) บวกค่า PM2.5 ทุกวัน = '+t.sum.toFixed(1)+'\n3) หารด้วยจำนวนวัน: '+t.sum.toFixed(1)+' ÷ '+t.n+' = '+(t.sum/t.n).toFixed(1)+' µg/m³')+'</div>'
+     +'<div class="r"><span>▲ สูงสุด '+tipI('ค่าสูงสุดของสถานี '+s.code+'\nหาค่า PM2.5 รายวันที่มากที่สุดจาก '+t.n+' วัน ('+how+')\n= '+t.max.v.toFixed(1)+' µg/m³ เมื่อ '+dTxt(t.max.y,t.max.m,t.max.d))+'</span><span><b>'+t.max.v.toFixed(1)+'</b><em>'+dTxt(t.max.y,t.max.m,t.max.d)+'</em></span></div>'
+     +'<div class="r"><span>▼ ต่ำสุด '+tipI('ค่าต่ำสุดของสถานี '+s.code+'\nหาค่า PM2.5 รายวันที่น้อยที่สุดจาก '+t.n+' วัน ('+how+')\n= '+t.min.v.toFixed(1)+' µg/m³ เมื่อ '+dTxt(t.min.y,t.min.m,t.min.d))+'</span><span><b>'+t.min.v.toFixed(1)+'</b><em>'+dTxt(t.min.y,t.min.m,t.min.d)+'</em></span></div>'
+     +'<div class="r"><span>เกิน '+TH+' µg/m³ '+tipI('จำนวนวันเกินมาตรฐานไทย\n1) นับวันที่ PM2.5 > '+TH+' µg/m³ = '+t.over+' วัน\n2) จากวันที่มีข้อมูลทั้งหมด '+t.n+' วัน\n3) '+t.over+' ÷ '+t.n+' × 100 = '+pct(t.over,t.n))+'</span><span><b>'+t.over+'</b><em>จาก '+t.n+' วัน ('+pct(t.over,t.n)+')</em></span></div>'
      +'<div class="xstack" title="สัดส่วนวันตามระดับ PM2.5">'+bar+'</div></div>';}).join('')+'</div>'
      +'<div class="xlegend">แถบล่างในการ์ด = สัดส่วนวันแต่ละระดับ: '+BOUNDS.concat([null]).map((b,i)=>'<span><i style="background:'+PMC[i]+'"></i>'+(i===0?'≤ '+b:(b==null?'> '+BOUNDS[3]:BOUNDS[i-1]+'–'+b))+'</span>').join('')+'</div>';
-  /* 2) ความตรงกัน */
+  /* B) วันที่ทุกสถานีมีค่าตรงกัน */
+  const both=use.filter(r=>r.all),N=both.length;
   h+='<h3 class="sec">วันที่ทุกสถานีมีค่าตรงกัน</h3>';
   if(!N){h+='<p class="note">ไม่มีวันที่ทุกสถานีมีข้อมูลพร้อมกันในช่วงนี้</p>';}
   else{
     let allOver=0,noneOver=0,sameLv=0,near=0,spreadSum=0;
-    both.forEach(r=>{const mx=Math.max(...r.vals),mn=Math.min(...r.vals);r.spread=mx-mn;spreadSum+=r.spread;
+    both.forEach(r=>{const mxv=Math.max(...r.vals),mnv=Math.min(...r.vals);r.spread=mxv-mnv;spreadSum+=r.spread;
       const ov=r.vals.filter(v=>v>TH).length;if(ov===n)allOver++;else if(ov===0)noneOver++;
-      if(new Set(r.vals.map(pmCat)).size===1)sameLv++;if(r.spread<=tol)near++;});
+      if(r.same)sameLv++;if(r.spread<=TOL)near++;});
     const part=N-allOver-noneOver;
     h+='<div class="xkpi">'
-     +'<div class="xk"><div class="v">'+pct(sameLv,N)+'<small>'+sameLv+' / '+N+' วัน</small></div><div class="t">อยู่ระดับ PM2.5 เดียวกันทุกสถานี</div><div class="n">ตามเส้นแบ่งสี '+BOUNDS.join(' / ')+' µg/m³</div></div>'
-     +'<div class="xk"><div class="v">'+pct(near,N)+'<small>'+near+' / '+N+' วัน</small></div><div class="t">ค่าใกล้เคียงกัน (ต่างกันไม่เกิน '+tol+')</div><div class="n">สูงสุด − ต่ำสุดระหว่างสถานีในวันเดียวกัน</div></div>'
-     +'<div class="xk"><div class="v">'+(spreadSum/N).toFixed(1)+'<small>µg/m³</small></div><div class="t">ความต่างเฉลี่ยระหว่างสถานี</div><div class="n">เฉลี่ยของ (สูงสุด − ต่ำสุด) ต่อวัน</div></div>'
+     +'<div class="xk"><div class="v">'+pct(sameLv,N)+'<small>'+sameLv+' / '+N+' วัน</small></div><div class="t">อยู่ระดับ PM2.5 เดียวกันทุกสถานี '+tipI('วิธีคำนวณ\n1) เลือกวันที่ทุกสถานีมีข้อมูลพร้อมกัน = '+N+' วัน\n2) จัดระดับของแต่ละสถานีตามเส้นแบ่ง '+lvTxt()+' µg/m³ (ตรงกับสีบนแผนที่)\n3) นับวันที่ทุกสถานีอยู่ระดับเดียวกัน = '+sameLv+' วัน\n4) '+sameLv+' ÷ '+N+' × 100 = '+pct(sameLv,N))+'</div><div class="n">ตามเส้นแบ่งสี '+lvTxt()+' µg/m³</div></div>'
+     +'<div class="xk"><div class="v">'+pct(near,N)+'<small>'+near+' / '+N+' วัน</small></div><div class="t">ค่าใกล้เคียงกัน (ต่างกันไม่เกิน '+TOL+') '+tipI('วิธีคำนวณ\n1) ในแต่ละวันที่ทุกสถานีมีข้อมูล ('+N+' วัน) หา ค่าสูงสุด − ค่าต่ำสุด ระหว่างสถานี\n2) นับวันที่ผลต่างนั้น ≤ '+TOL+' µg/m³ = '+near+' วัน\n3) '+near+' ÷ '+N+' × 100 = '+pct(near,N))+'</div><div class="n">สูงสุด − ต่ำสุดระหว่างสถานีในวันเดียวกัน</div></div>'
+     +'<div class="xk"><div class="v">'+(spreadSum/N).toFixed(1)+'<small>µg/m³</small></div><div class="t">ความต่างเฉลี่ยระหว่างสถานี '+tipI('วิธีคำนวณ\n1) ทุกวันที่ทุกสถานีมีข้อมูล ('+N+' วัน) คำนวณ ค่าสูงสุด − ค่าต่ำสุดของวันนั้น\n2) รวมผลต่างทุกวัน = '+spreadSum.toFixed(1)+'\n3) หารด้วยจำนวนวัน: '+spreadSum.toFixed(1)+' ÷ '+N+' = '+(spreadSum/N).toFixed(1)+' µg/m³')+'</div><div class="n">เฉลี่ยของ (สูงสุด − ต่ำสุด) ต่อวัน</div></div>'
      +'</div>';
     const seg=[[allOver,PMC[4],'เกิน '+TH+' ทุกสถานี'],[part,PMC[2],'เกินบางสถานี'],[noneOver,PMC[0],'ไม่เกินทุกสถานี']];
-    h+='<div class="note" style="margin-top:10px"><b>เทียบกับมาตรฐานไทย (> '+TH+' µg/m³)</b> · วันที่ทุกสถานีมีข้อมูล '+N+' วัน</div><div class="xstack" style="height:18px">'
+    h+='<div class="note" style="margin-top:10px"><b>เทียบกับมาตรฐานไทย (> '+TH+' µg/m³)</b> · วันที่ทุกสถานีมีข้อมูล '+N+' วัน '+tipI('วิธีคำนวณ\n1) ในแต่ละวันที่ทุกสถานีมีข้อมูล ('+N+' วัน) นับว่ามีกี่สถานีที่ PM2.5 > '+TH+'\n2) ทุกสถานี ('+n+' จาก '+n+') = '+allOver+' วัน · บางสถานี = '+part+' วัน · ไม่มีสถานีไหนเลย = '+noneOver+' วัน\n3) ความกว้างแต่ละช่วง = จำนวนวัน ÷ '+N)+'</div><div class="xstack" style="height:18px">'
       +seg.map(x=>x[0]?'<i style="width:'+(100*x[0]/N).toFixed(2)+'%;background:'+x[1]+'" title="'+x[2]+': '+x[0]+' วัน"></i>':'').join('')+'</div>'
       +'<div class="xlegend">'+seg.map(x=>'<span><i style="background:'+x[1]+'"></i>'+x[2]+' <b>'+x[0]+'</b> วัน ('+pct(x[0],N)+')</span>').join('')+'</div>';
-    /* คู่สถานี */
-    h+='<h3 class="sec">เทียบเป็นคู่สถานี</h3><div class="tw" style="max-height:none"><table class="dt"><thead><tr><th class="c0">คู่สถานี</th><th>วันที่มีทั้งคู่</th><th>สัมพันธ์ (r)</th><th>ต่างกันเฉลี่ย</th><th>ระดับเดียวกัน</th><th>ใกล้เคียง ≤ '+tol+'</th></tr></thead><tbody>';
-    for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){
-      const a=[],b=[];rows.forEach(r=>{if(r.vals[i]!=null&&r.vals[j]!=null){a.push(r.vals[i]);b.push(r.vals[j]);}});
-      const r_=pearson(a,b);let ad=0,sl=0,nr=0;a.forEach((v,k)=>{const df=Math.abs(v-b[k]);ad+=df;if(pmCat(v)===pmCat(b[k]))sl++;if(df<=tol)nr++;});
-      h+='<tr><td class="c0" style="font-family:inherit;text-align:left"><b>'+esc(codes[i])+'</b> ↔ <b>'+esc(codes[j])+'</b></td><td>'+a.length+'</td><td'+(r_!=null?' style="'+shadeR(r_)+'"':'')+'>'+(r_==null?'—':r_.toFixed(2))+'</td><td>'+(a.length?(ad/a.length).toFixed(1):'—')+'</td><td>'+pct(sl,a.length)+'</td><td>'+pct(nr,a.length)+'</td></tr>';}
-    h+='</tbody></table></div>';
-    /* วันที่ต่างกันมากสุด / ตรงกันมากสุดที่ค่าสูง */
-    const top=both.slice().sort((x,y)=>y.spread-x.spread).slice(0,5);
-    const hd='<th class="c0">วันที่</th>'+ST.map(s=>'<th>'+esc(s.code)+'</th>').join('')+'<th>ต่างกัน</th>';
-    const rowH=r=>'<tr><td class="c0" style="font-family:inherit;text-align:left">'+dTxt(r.y,r.m,r.d)+'</td>'+r.vals.map(v=>'<td style="'+shadePM(v)+'">'+v.toFixed(1)+'</td>').join('')+'<td><b>'+r.spread.toFixed(1)+'</b></td></tr>';
-    const hi=both.filter(r=>r.vals.every(v=>v>TH)).sort((x,y)=>Math.min(...y.vals)-Math.min(...x.vals)).slice(0,5);
-    h+='<div class="mapgrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;margin-top:6px"><div><h3 class="sec">5 วันที่สถานีต่างกันมากที่สุด</h3><div class="tw" style="max-height:none"><table class="dt"><thead><tr>'+hd+'</tr></thead><tbody>'+top.map(rowH).join('')+'</tbody></table></div></div>'
-      +'<div><h3 class="sec">5 วันที่เกินมาตรฐานพร้อมกันทุกสถานี (ต่ำสุดสูงที่สุด)</h3>'+(hi.length?'<div class="tw" style="max-height:none"><table class="dt"><thead><tr>'+hd+'</tr></thead><tbody>'+hi.map(rowH).join('')+'</tbody></table></div>':'<p class="note">ไม่มีวันที่เกินพร้อมกันทุกสถานี</p>')+'</div></div>';
   }
-  h+='<p class="note">r = สหสัมพันธ์ของค่ารายวัน (ยิ่งใกล้ 1 ยิ่งขึ้นลงตามกัน) · "ตรงกัน" นับเฉพาะวันที่ทุกสถานีมีข้อมูลพร้อมกัน</p>';
-  body.innerHTML=h;
+  /* C) ความแตกต่างแต่ละสถานี */
+  const monSet=[...new Set(rows.map(r=>r.m))].sort((a,b)=>a-b);
+  if(cmpMon!=='all'&&monSet.indexOf(+cmpMon)<0)cmpMon='all';
+  h+='<h3 class="sec" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px">ความแตกต่างแต่ละสถานี '+tipI('เทียบแต่ละสถานีกับ "ค่าเฉลี่ยของกลุ่ม" ในวันเดียวกัน\n1) ใช้เฉพาะวันที่ทุกสถานีมีข้อมูลพร้อมกัน\n2) ค่าเฉลี่ยกลุ่มของวัน = ค่าเฉลี่ยของทุกสถานีในวันนั้น\n3) ความต่างของสถานี = ค่าของสถานี − ค่าเฉลี่ยกลุ่ม (+ สูงกว่า / − ต่ำกว่า)')
+   +'<label style="font-weight:400;font-size:14px;display:flex;gap:6px;align-items:center">ช่วงเวลา <select id="x-mon"><option value="all">ทั้งหมด</option>'+monSet.map(m=>'<option value="'+m+'"'+(String(m)===String(cmpMon)?' selected':'')+'>'+MF[m]+'</option>').join('')+'</select></label></h3>';
+  const sub=both.filter(r=>cmpMon==='all'||r.m===+cmpMon).sort((a,b)=>a.y-b.y||a.m-b.m||a.d-b.d),M=sub.length;
+  const perC=cmpMon==='all'?'ทุกเดือน':MF[+cmpMon];
+  if(!M){h+='<p class="note">ไม่มีวันที่ทุกสถานีมีข้อมูลพร้อมกันใน'+esc(perC)+'</p>';}
+  else{
+    const dev=codes.map(()=>[]),gm=sub.map(r=>r.vals.reduce((a,b)=>a+b,0)/n);
+    sub.forEach((r,k)=>r.vals.forEach((v,i)=>dev[i].push(v-gm[k])));
+    const series=ST.map((s,i)=>({label:s.code+' ('+s.province+')',color:stCol(s,i),dash:stDash(codes,i),shape:stShape(i),vals:dev[i]}));
+    const fr=chartDev('xd',{title:'ความแตกต่างของแต่ละสถานีจากค่าเฉลี่ยกลุ่ม — '+perC+(sub[0]?' '+sub[0].y:''),sub:M+' วัน · ใช้ข้อมูล: '+modeTxt,notes:['แหล่งข้อมูล: '+DS.source,'ค่าเฉลี่ยกลุ่ม = เฉลี่ยของ '+codes.join(', ')+' ในวันเดียวกัน'],xl:sub.map(r=>(r.d+1)+' '+MS[r.m]),xfull:sub.map(r=>dIso(r.y,r.m,r.d)),series,raw:codes.map((c,i)=>sub.map(r=>r.vals[i])),name:'pm25_station_diff_'+(cmpMon==='all'?'all':MS[+cmpMon])});
+    FIGS.xd={csv:fr.csv,name:fr.name};
+    h+='<div class="figure">'+fr.svg+'</div><div style="margin-top:8px">'+toolbarHTML('xd')+'</div>';
+    const st2=codes.map((c,i)=>{let sd=0,ad=0,hi=0,lo=0,sm=0;sub.forEach((r,k)=>{const v=r.vals[i];sm+=v;sd+=v-gm[k];let a=0;r.vals.forEach((u,j)=>{if(j!==i)a+=Math.abs(v-u);});ad+=a/(n-1);if(v===Math.max(...r.vals))hi++;if(v===Math.min(...r.vals))lo++;});return{avg:sm/M,dev:sd/M,abs:ad/M,hi,lo};});
+    h+='<div class="tw" style="max-height:none"><table class="dt"><thead><tr><th class="c0">สถานี</th><th>จำนวนวัน</th><th>ค่าเฉลี่ย (µg/m³)</th><th>ต่างจากค่าเฉลี่ยกลุ่ม '+tipI('เฉลี่ยของ (ค่าสถานี − ค่าเฉลี่ยกลุ่ม) ทุกวัน\n+ = สถานีนี้วัดได้สูงกว่ากลุ่มโดยเฉลี่ย\n− = ต่ำกว่ากลุ่มโดยเฉลี่ย')+'</th><th>ต่างจากสถานีอื่น (เฉลี่ย) '+tipI('1) แต่ละวัน หาผลต่างสัมบูรณ์ระหว่างสถานีนี้กับแต่ละสถานีอื่น แล้วเฉลี่ย\n2) เฉลี่ยค่านั้นทุกวัน — ยิ่งต่ำยิ่งใกล้เคียงสถานีอื่น')+'</th><th>วันที่สูงสุดในกลุ่ม '+tipI('จำนวนวันที่สถานีนี้มีค่า PM2.5 สูงที่สุดในบรรดาทุกสถานี')+'</th><th>วันที่ต่ำสุดในกลุ่ม '+tipI('จำนวนวันที่สถานีนี้มีค่า PM2.5 ต่ำที่สุดในบรรดาทุกสถานี')+'</th></tr></thead><tbody>'
+      +ST.map((s,i)=>{const t=st2[i];return'<tr><td class="c0" style="font-family:inherit;text-align:left"><b>'+esc(s.code)+'</b> <small style="color:var(--mute)">'+esc(s.province)+'</small></td><td>'+M+'</td><td>'+t.avg.toFixed(1)+'</td><td><b>'+sgn(t.dev)+'</b></td><td>'+t.abs.toFixed(1)+'</td><td>'+t.hi+' ('+pct(t.hi,M)+')</td><td>'+t.lo+' ('+pct(t.lo,M)+')</td></tr>';}).join('')+'</tbody></table></div>';
+    const top=sub.slice().sort((a,b)=>b.spread-a.spread).slice(0,5).map(r=>({t:'ต่างกันมาก',r}));
+    const hi5=sub.filter(r=>r.vals.every(v=>v>TH)).sort((a,b)=>Math.min(...b.vals)-Math.min(...a.vals)).slice(0,5).map(r=>({t:'เกินพร้อมกัน',r}));
+    const rowH=x=>'<tr><td style="font-family:inherit;text-align:left"><span class="xtag '+(x.t==='เกินพร้อมกัน'?'b':'a')+'">'+x.t+'</span></td><td class="c0" style="font-family:inherit;text-align:left;position:static">'+dTxt(x.r.y,x.r.m,x.r.d)+'</td>'+x.r.vals.map(v=>'<td style="'+shadePM(v)+'">'+v.toFixed(1)+'</td>').join('')+'<td><b>'+x.r.spread.toFixed(1)+'</b></td></tr>';
+    h+='<h3 class="sec" style="font-size:14px">วันที่น่าสนใจ '+tipI('รวม 2 รายการในตารางเดียว (เฉพาะช่วงเวลาที่เลือก)\n• ต่างกันมาก = 5 วันที่ (ค่าสูงสุด − ต่ำสุด) ระหว่างสถานีมากที่สุด\n• เกินพร้อมกัน = วันที่ทุกสถานีเกิน '+TH+' เรียงตามค่าต่ำสุดของวันนั้นจากมากไปน้อย (ไม่เกิน 5 วัน)')+'</h3><div class="tw" style="max-height:none"><table class="dt"><thead><tr><th style="text-align:left">ประเภท</th><th class="c0" style="position:static;text-align:left">วันที่</th>'+ST.map(s=>'<th>'+esc(s.code)+'</th>').join('')+'<th>ต่างกัน</th></tr></thead><tbody>'+top.concat(hi5).map(rowH).join('')+'</tbody></table></div>';
+  }
+  h+='<p class="note">"ตรงกัน" นับเฉพาะวันที่ทุกสถานีมีข้อมูลพร้อมกัน · ชุดข้อมูลนี้เก็บตัวอย่างไม่ครบทุกวัน · วางเมาส์บน ⓘ เพื่อดูขั้นตอนการคำนวณ</p>';
+  body.innerHTML=h;syncTb();
+  renderHp();
 }
-const shadeR=r=>'background:'+rgba('#1F3A5F',Math.max(0,Math.min(1,(r-0.3)/0.7))*0.35);
+
+/* ---------- จุดความร้อน (แท่ง) เทียบ PM2.5 (เส้นจุด) ---------- */
+function chartHsPm(key,o){
+  const st=sty(),W=960,L=74,R=70,ch=330,B=58,N=o.xl.length||1;
+  let mh=0;o.bars.forEach(b=>b.vals.forEach(v=>{if(v!=null&&v>mh)mh=v;}));
+  let mp=0;o.lines.forEach(l=>l.vals.forEach(v=>{if(v!=null&&v>mp)mp=v;}));
+  const nt=niceTicks(mh*1.08),nl=nt.ticks.length-1||1,stepR=Math.max(5,Math.ceil(mp*1.1/nl/5)*5),topR=stepR*nl,top=nt.top;
+  const items=o.bars.map(b=>({k:'box',c:b.color,o:.9,t:b.label})).concat(o.lines.map(l=>({k:'mline',c:l.color,d:l.dash,shape:st.shapes?(l.shape||0):0,t:l.label})));
+  const f=frame(st,{W,L,R,B,ch,title:o.title,sub:o.sub,items,notes:o.notes});
+  const cw=W-L-R,X=i=>L+cw*(i+.5)/N,Y=v=>f.T+ch-(v/top)*ch,YR=v=>f.T+ch-(v/topR)*ch;
+  let s=axes(st,{L,T:f.T,cw,ch,ticks:nt.ticks,Y,tickFmt:t=>String(Math.round(t))});
+  nt.ticks.forEach((t,i)=>{s+=T_(st,L+cw+9,YR(i*stepR)+4,String(i*stepR),{sz:11,fill:st.text});});
+  const gw=cw/N*.64,bw=gw/o.bars.length;
+  o.bars.forEach((b,bi)=>b.vals.forEach((v,i)=>{if(v==null)return;const x=X(i)-gw/2+bi*bw,y=Y(v);
+    s+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+(bw-2).toFixed(1)+'" height="'+Math.max(0,f.T+ch-y).toFixed(1)+'" fill="'+b.color+'" opacity=".9"/>';
+    if(v>0)s+=T_(st,(x+(bw-2)/2).toFixed(1),(y-4).toFixed(1),v.toLocaleString('en-US'),{anchor:'middle',sz:10,fill:st.text});}));
+  o.xl.forEach((lb,i)=>{s+=T_(st,X(i).toFixed(1),f.T+ch+19,lb,{anchor:'middle',sz:12});});
+  o.lines.forEach(sr=>{
+    let d='',pen=false;sr.vals.forEach((v,i)=>{if(v==null){pen=false;return;}d+=(pen?'L':'M')+X(i).toFixed(1)+','+YR(v).toFixed(1);pen=true;});
+    if(d)s+='<path d="'+d+'" fill="none" stroke="'+sr.color+'" stroke-width="'+(sr.dash?1.8:st.lw)+'"'+(sr.dash?' stroke-dasharray="'+sr.dash+'"':'')+' stroke-linejoin="round" stroke-linecap="round"/>';
+    sr.vals.forEach((v,i)=>{if(v==null)return;s+=mark(st.shapes?(sr.shape||0):0,X(i).toFixed(1),YR(v).toFixed(1),st.pr-1,sr.dash?'#fff':sr.color,sr.dash?sr.color:'#fff',1.3);});
+  });
+  s+=T_(st,18,f.T+ch/2,'จำนวนจุดความร้อน (จุด)',{anchor:'middle',sz:12,rot:1});
+  s+=T_(st,W-14,f.T+ch/2,'PM2.5 เฉลี่ยรายเดือน (µg/m³)',{anchor:'middle',sz:12,rot:1});
+  s+=T_(st,L+cw/2,f.T+ch+42,'เดือน',{anchor:'middle',sz:12});
+  const csv=[['เดือน'].concat(o.bars.map(b=>b.label+' (จุด)'),o.lines.map(l=>l.label+' (µg/m³)'))].concat(o.xl.map((lb,i)=>[o.xfull[i]].concat(o.bars.map(b=>b.vals[i]==null?'':b.vals[i]),o.lines.map(l=>l.vals[i]==null?'':+l.vals[i].toFixed(2)))));
+  return{svg:wrapSVG(key,W,f,s,''),csv,name:o.name};
+}
+function renderHp(){
+  const box=$('hp-fig');if(!box)return;
+  if(!window.HS3||!HS3.rows){box.innerHTML='<p class="note">ไม่พบไฟล์ data/hotspot3.js</p>';$('hp-table').innerHTML='';return;}
+  const y=Y1,sat=$('hp-sat').value,months=dataMonths(y);
+  const provs=[...new Set(ST.map(s=>s.province))];
+  const hsLast=Math.max(...HS3.rows.filter(r=>r[0]===y).map(r=>r[1]),0);
+  const hot=p=>months.map(m=>m+1>hsLast?null:HS3.rows.filter(r=>r[0]===y&&r[1]===m+1&&r[2]===p&&(sat==='all'||r[3]===sat)).reduce((a,r)=>a+r[4],0));
+  const bcol=['#B5532F','#D9A441','#7A6A2E'];
+  const bars=provs.map((p,i)=>({label:'จุดความร้อน จ.'+p,color:bcol[i%3],vals:hot(p),prov:p}));
+  const lines=ST.map((s,i)=>({label:'PM2.5 '+s.code+' ('+s.province+')',color:stCol(s,i),dash:stDash(0,i),shape:stShape(i),vals:months.map(m=>val('S:'+s.code,y,m,'avg'))}));
+  const satTxt=sat==='all'?'MODIS + VIIRs':sat==='MODIS'?'MODIS':'VIIRs';
+  const r=chartHsPm('hp',{title:'จุดความร้อนในพื้นที่ป่า (แท่ง) เทียบกับ PM2.5 รายเดือน (เส้นจุด) ปี '+y,sub:'ดาวเทียม: '+satTxt,notes:[HS3.source,'จุดความร้อนรายจังหวัดของสถานี · PM2.5 = ค่าเฉลี่ยรายเดือนของแต่ละสถานี'+(hsLast<Math.max(...months)+1?' · เดือนหลัง '+MS[hsLast-1]+' ยังไม่มีข้อมูลจุดความร้อน':'')],xl:months.map(m=>MS[m]),xfull:months.map(m=>y+'-'+String(m+1).padStart(2,'0')),bars,lines,name:'hotspot_vs_pm25_'+y+'_'+sat});
+  FIGS.hp={csv:r.csv,name:r.name};box.innerHTML=r.svg;
+  const f0=v=>v==null?'—':v.toLocaleString('en-US');
+  const tot=months.map((m,i)=>bars.some(b=>b.vals[i]==null)?null:bars.reduce((a,b)=>a+b.vals[i],0));
+  const rowsT=months.map((m,i)=>[MF[m]].concat(bars.map(b=>b.vals[i]),[tot[i]],lines.map(l=>l.vals[i])));
+  let h='<div class="tw" style="max-height:none"><table class="dt"><thead><tr><th class="c0">เดือน '+y+'</th>'+bars.map(b=>'<th>จุดความร้อน<br>จ.'+esc(b.prov)+'</th>').join('')+'<th>จุดความร้อน<br>รวม</th>'+ST.map(s=>'<th>PM2.5 '+esc(s.code)+'<br><small style="font-weight:400">'+esc(s.province)+'</small></th>').join('')+'</tr></thead><tbody>'
+   +rowsT.map(r=>'<tr><td class="c0" style="font-family:inherit;text-align:left">'+r[0]+'</td>'+r.slice(1,2+bars.length).map(v=>'<td'+(v!=null?' style="background:rgba(181,83,47,'+(0.04+0.3*Math.min(1,v/Math.max(1,...tot.filter(x=>x!=null)))).toFixed(2)+')"':'')+'>'+f0(v)+'</td>').join('')+r.slice(2+bars.length).map(v=>'<td'+(v!=null?' style="'+shadePM(v)+'"':'')+'>'+(v==null?'—':v.toFixed(1))+'</td>').join('')+'</tr>').join('')
+   +'<tr style="font-weight:700"><td class="c0" style="font-family:inherit;text-align:left">รวม / เฉลี่ย</td>'+bars.map(b=>'<td>'+f0(b.vals.every(v=>v==null)?null:b.vals.reduce((a,v)=>a+(v||0),0))+'</td>').join('')+'<td>'+f0(tot.every(v=>v==null)?null:tot.reduce((a,v)=>a+(v||0),0))+'</td>'+lines.map(l=>{const v=l.vals.filter(x=>x!=null);return'<td>'+(v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):'—')+'</td>';}).join('')+'</tr></tbody></table></div>'
+   +'<p class="note">จุดความร้อน = จำนวนจุดในพื้นที่ป่า (ป่าสงวนฯ + ป่าอนุรักษ์) รายเดือน ของจังหวัดที่สถานีตั้งอยู่ · "—" = ยังไม่มีข้อมูล · แถวรวม: จุดความร้อนเป็นผลรวม, PM2.5 เป็นค่าเฉลี่ยของเดือนที่มีข้อมูล</p>';
+  $('hp-table').innerHTML=h;
+  hpT=[['เดือน'].concat(bars.map(b=>'จุดความร้อน จ.'+b.prov),['จุดความร้อนรวม'],lines.map(l=>l.label+' (µg/m³)'))].concat(rowsT.map(r=>r.map((v,k)=>v==null?'':(k>1+bars.length?+(+v).toFixed(2):v))));
+}
+$('hp-tcsv').onclick=()=>{if(hpT)dlCSV(hpT,'hotspot_vs_pm25_table.csv');};
+$('hp-sat').addEventListener('change',renderHp);
+$('x-body').addEventListener('change',e=>{if(e.target.id==='x-mon'){cmpMon=e.target.value;renderCmp();}});
 $('x-csv').onclick=()=>{if(!cmpRows.length)return;dlCSV([['วันที่'].concat(ST.map(s=>s.code+' ('+s.province+')'),['ต่ำสุด','สูงสุด','ต่างกัน','เกินมาตรฐานไทยกี่สถานี']) ].concat(cmpRows.map(r=>{const v=r.vals.filter(x=>x!=null),mx=Math.max(...v),mn=Math.min(...v);return[dIso(r.y,r.m,r.d)].concat(r.vals.map(x=>x==null?'':+x.toFixed(2)),[+mn.toFixed(2),+mx.toFixed(2),+(mx-mn).toFixed(2),v.filter(x=>x>TH).length]);})),'pm25_compare_stations.csv');};
-['x-y','x-sea','x-tol'].forEach(id=>$(id).addEventListener('change',renderCmp));
+['x-y','x-sea','x-mode'].forEach(id=>$(id).addEventListener('change',renderCmp));
 
 const RENDER={map:renderMap,conc:renderConc,exc:renderExc,cmp:renderCmp,bl:renderBl,tr:renderTr};
 const PAGEN={map:'แผนที่',conc:'ความเข้มข้น',exc:'วันที่เกินมาตรฐาน',cmp:'เทียบสถานี',bl:'Baseline',tr:'กราฟและส่งออกข้อมูล'};
 let CUR='map';
-const pagesOf=()=>{const a=DS.years[1]>DS.years[0]?['map','conc','exc','bl','tr']:['map','conc','exc'];if(ST.length>=2)a.splice(3,0,'cmp');return a;};
+const pagesOf=()=>{const a=DS.years[1]>DS.years[0]?['map','conc','exc','bl','tr']:['map','conc','exc'];if(DS.id==='s3'&&ST.length>=2)a.splice(3,0,'cmp');return a;};
 function refresh(){try{if(RENDER[CUR])RENDER[CUR]();}catch(e){showErr('เกิดข้อผิดพลาด: '+e.message);console.error(e);}}
 function go(pg){
   const pages=pagesOf();CUR=pages.indexOf(pg)>=0?pg:'map';
@@ -1291,7 +1408,7 @@ function fillControls(){
   if(!(YEARS.length>1)){$('c-mode').value='month';$('e-mode').value='month';}
 }
 function switchSet(id,pg){
-  loadSet(id);selCode=null;PGI=0;
+  loadSet(id);$('cov-t').textContent=DS.id==='s3'?'เกณฑ์ข้อมูล':'เกณฑ์ข้อมูลครบ';selCode=null;PGI=0;
   document.querySelectorAll('#setseg button').forEach(b=>b.classList.toggle('on',b.dataset.set===DS.id));
   BL.years=new Set();applyPreset('p2019');
   MINCOV=+DS.minCoverage;const opt=[...$('cov').options].find(o=>+o.value===MINCOV);if(opt)$('cov').value=opt.value;else{$('cov').insertAdjacentHTML('beforeend','<option value="'+MINCOV+'">≥ '+Math.round(MINCOV*100)+'%</option>');$('cov').value=String(MINCOV);}
@@ -1342,7 +1459,7 @@ switchSet(hm&&SETS.some(s=>s.id===hm[1])?hm[1]:SETS[0].id,hm?hm[2]:'map');
   var el=function(i){return document.getElementById(i);};
   function fail(m){el('boot').style.display='none';var b=el('err');b.style.display='block';b.textContent=m;}
   function load(src,cb){var s=document.createElement('script');s.src=src+T;s.onload=function(){cb(true);};s.onerror=function(){cb(false);};document.head.appendChild(s);}
-  var pend=2;
+  var pend=3;
   function stage2(){
     if(--pend>0)return;
     if(!window.PM25_CFG)return fail('ไม่พบไฟล์ data/config.js — ต้องวางโฟลเดอร์ data ไว้ข้าง index.html');
@@ -1353,7 +1470,7 @@ switchSet(hm&&SETS.some(s=>s.id===hm[1])?hm[1]:SETS[0].id,hm?hm[2]:'map');
     if(!left)return run();
     codes.forEach(function(c){load('data/daily/'+encodeURIComponent(c)+'.js',function(){if(--left===0)run();});});
   }
-  load('data/config.js',stage2);load('data/geo.js',stage2);
+  load('data/config.js',stage2);load('data/geo.js',stage2);load('data/hotspot3.js',stage2);
 })();
 </script>
 </body>

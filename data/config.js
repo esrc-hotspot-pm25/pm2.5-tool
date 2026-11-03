@@ -1,7 +1,7 @@
 window.PM25_CFG={
  "meta": {
   "title": "PM2.5 ภาคเหนือตอนบน",
-  "updated": "2026-11-02"
+  "updated": "2026-11-03"
  },
  "settings": {
   "th": 37.5,
@@ -22,7 +22,7 @@ window.PM25_CFG={
    "sub": "กรมควบคุมมลพิษ",
    "years": [
     2012,
-    2025
+    2026
    ],
    "minCoverage": 0.75,
    "sampled": false,
@@ -85,6 +85,15 @@ window.PM25_CFG={
    "lat": 18.791,
    "lon": 98.988,
    "rep": true
+  },
+  {
+   "code": "35t",
+   "set": "k11",
+   "location": "อ.เมืองเชียงใหม่",
+   "province": "เชียงใหม่",
+   "lat": 18.788,
+   "lon": 98.994,
+   "rep": false
   },
   {
    "code": "57t",
@@ -201,6 +210,15 @@ window.PM25_CFG={
    "province": "ลำพูน",
    "lat": 17.80283,
    "lon": 98.95053,
+   "rep": false
+  },
+  {
+   "code": "o73",
+   "set": "k11",
+   "location": "อ.ลี้",
+   "province": "ลำพูน",
+   "lat": 17.8,
+   "lon": 98.95,
    "rep": false
   }
  ],

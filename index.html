@@ -299,7 +299,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 22px 30px;font-size:12.5px;color
   <nav class="subnav" id="cmp-nav" aria-label="หัวข้อเทียบสถานี">
     <button data-sub="a" class="on"><b>เทียบ 3 สถานี</b><small>ค่าที่ตรงกัน · สูงสุด–ต่ำสุด</small></button>
     <button data-sub="b"><b>จุดความร้อนเทียบกับ 3 สถานี</b><small>แท่งจุดความร้อน · เส้น PM2.5</small></button>
-    <button data-sub="c"><b>3 สถานีเทียบกับสถานี คพ.</b><small>เชียงใหม่ 36t · 35t / ลำพูน 68t</small></button>
+    <button data-sub="c"><b>3 สถานีเทียบกับสถานี คพ.</b><small>เชียงใหม่ 36t · 35t / ลำพูน 68t · o73</small></button>
   </nav>
   <div class="subbody">
 <div id="cmp-a">
@@ -330,7 +330,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 22px 30px;font-size:12.5px;color
 <div id="cmp-c" style="display:none">
   <div class="card">
     <h2>3 สถานีเทียบกับสถานี คพ.</h2>
-    <p class="note" style="margin:4px 0 0">เชียงใหม่: CM เทียบ 36t และ 35t · ลำพูน: LP, LI เทียบ 68t</p>
+    <p class="note" style="margin:4px 0 0">เชียงใหม่: CM เทียบ 36t และ 35t · ลำพูน: LP, LI เทียบ 68t และ o73</p>
     <div class="bar" style="margin-top:8px">
       <label>ข้อมูลที่ใช้ <select id="pc-mode"><option value="all">ทั้งหมด</option><option value="match">วันที่มีค่าครบทุกสถานีในกราฟ</option></select></label>
       <button class="btn" id="pc-csv">ส่งออก CSV รายวัน</button>
@@ -1370,19 +1370,28 @@ function renderHp(){
   const hot=p=>months.map(m=>m+1>hsLast?null:HS3.rows.filter(r=>r[0]===y&&r[1]===m+1&&r[2]===p&&(sat==='all'||r[3]===sat)).reduce((a,r)=>a+r[4],0));
   const bcol=['#B5532F','#D9A441','#7A6A2E'];
   const bars=provs.map((p,i)=>({label:'จุดความร้อน จ.'+p,color:bcol[i%3],vals:hot(p),prov:p}));
+  /* ระดับอำเภอ (อำเภอที่สถานีตั้งอยู่) */
+  const A=(window.HS3A&&HS3A.rows)||[];
+  const aLast=Math.max(...A.filter(r=>r[0]===y).map(r=>r[1]),0);
+  const dcol=['#E8A07F','#F2CE7E','#8A6D1E'];
+  const dnames=[];ST.forEach(s=>{const a=String(s.location||'').replace(/^อ\.\s*/,'').trim();if(a&&!dnames.some(d=>d.a===a))dnames.push({a,prov:s.province,codes:[]});dnames.find(d=>d.a===a).codes.push(s.code);});
+  const hotA=(a,p)=>months.map(m=>m+1>aLast?null:A.filter(r=>r[0]===y&&r[1]===m+1&&r[3]===a&&(sat==='all'||r[4]===sat)).reduce((x,r)=>x+r[5],0));
+  const dbars=A.length?dnames.map(d=>({label:'จุดความร้อน อ.'+d.a+' ('+d.codes.join(', ')+')',color:dcol[dnames.indexOf(d)%3],vals:hotA(d.a,d.prov),dist:d.a,prov:d.prov,codes:d.codes})):[];
   const lines=ST.map((s,i)=>({label:'PM2.5 '+s.code+' ('+s.province+')',color:stCol(s,i),dash:stDash(0,i),shape:stShape(i),vals:months.map(m=>val('S:'+s.code,y,m,'avg'))}));
   const satTxt=sat==='all'?'MODIS + VIIRs':sat==='MODIS'?'MODIS':'VIIRs';
-  const r=chartHsPm('hp',{title:'จุดความร้อนในพื้นที่ป่า (แท่ง) เทียบกับ PM2.5 รายเดือน (เส้นจุด) ปี '+y,sub:'ดาวเทียม: '+satTxt,notes:[HS3.source,'จุดความร้อนรายจังหวัดของสถานี · PM2.5 = ค่าเฉลี่ยรายเดือนของแต่ละสถานี'+(hsLast<Math.max(...months)+1?' · เดือนหลัง '+MS[hsLast-1]+' ยังไม่มีข้อมูลจุดความร้อน':'')],xl:months.map(m=>MS[m]),xfull:months.map(m=>y+'-'+String(m+1).padStart(2,'0')),bars,lines,name:'hotspot_vs_pm25_'+y+'_'+sat});
+  const r=chartHsPm('hp',{title:'จุดความร้อนในพื้นที่ป่า (แท่ง) เทียบกับ PM2.5 รายเดือน (เส้นจุด) ปี '+y,sub:'ดาวเทียม: '+satTxt,notes:[HS3.source,(dbars.length?'แท่งสีอ่อน = จุดความร้อนระดับอำเภอที่สถานีตั้งอยู่ ('+dnames.map(d=>'อ.'+d.a).join(', ')+') · ':'')+'จุดความร้อนรายจังหวัดของสถานี · PM2.5 = ค่าเฉลี่ยรายเดือนของแต่ละสถานี'+(hsLast<Math.max(...months)+1?' · เดือนหลัง '+MS[hsLast-1]+' ยังไม่มีข้อมูลจุดความร้อน':'')],xl:months.map(m=>MS[m]),xfull:months.map(m=>y+'-'+String(m+1).padStart(2,'0')),bars:bars.concat(dbars),lines,name:'hotspot_vs_pm25_'+y+'_'+sat});
   FIGS.hp={csv:r.csv,name:r.name};box.innerHTML=r.svg;
-  const f0=v=>v==null?'—':v.toLocaleString('en-US');
   const tot=months.map((m,i)=>bars.some(b=>b.vals[i]==null)?null:bars.reduce((a,b)=>a+b.vals[i],0));
-  const rowsT=months.map((m,i)=>[MF[m]].concat(bars.map(b=>b.vals[i]),[tot[i]],lines.map(l=>l.vals[i])));
-  let h='<div class="tw" style="max-height:none"><table class="dt"><thead><tr><th class="c0">เดือน '+y+'</th>'+bars.map(b=>'<th>จุดความร้อน<br>จ.'+esc(b.prov)+'</th>').join('')+'<th>จุดความร้อน<br>รวม</th>'+ST.map(s=>'<th>PM2.5 '+esc(s.code)+'<br><small style="font-weight:400">'+esc(s.province)+'</small></th>').join('')+'</tr></thead><tbody>'
-   +rowsT.map(r=>'<tr><td class="c0" style="font-family:inherit;text-align:left">'+r[0]+'</td>'+r.slice(1,2+bars.length).map(v=>'<td'+(v!=null?' style="background:rgba(181,83,47,'+(0.04+0.3*Math.min(1,v/Math.max(1,...tot.filter(x=>x!=null)))).toFixed(2)+')"':'')+'>'+f0(v)+'</td>').join('')+r.slice(2+bars.length).map(v=>'<td'+(v!=null?' style="'+shadePM(v)+'"':'')+'>'+(v==null?'—':v.toFixed(1))+'</td>').join('')+'</tr>').join('')
-   +'<tr style="font-weight:700"><td class="c0" style="font-family:inherit;text-align:left">รวม / เฉลี่ย</td>'+bars.map(b=>'<td>'+f0(b.vals.every(v=>v==null)?null:b.vals.reduce((a,v)=>a+(v||0),0))+'</td>').join('')+'<td>'+f0(tot.every(v=>v==null)?null:tot.reduce((a,v)=>a+(v||0),0))+'</td>'+lines.map(l=>{const v=l.vals.filter(x=>x!=null);return'<td>'+(v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):'—')+'</td>';}).join('')+'</tr></tbody></table></div>'
-   +'<p class="note">จุดความร้อน = จำนวนจุดในพื้นที่ป่า (ป่าสงวนฯ + ป่าอนุรักษ์) รายเดือน ของจังหวัดที่สถานีตั้งอยู่ · "—" = ยังไม่มีข้อมูล · แถวรวม: จุดความร้อนเป็นผลรวม, PM2.5 เป็นค่าเฉลี่ยของเดือนที่มีข้อมูล</p>';
+  const hcols=bars.map(b=>({h:'จุดความร้อน<br>จ.'+esc(b.prov),t:'จุดความร้อน จ.'+b.prov,v:b.vals})).concat([{h:'จุดความร้อน<br>รวม (จังหวัด)',t:'จุดความร้อนรวม',v:tot,tot:1}]).concat(dbars.map(b=>({h:'จุดความร้อน<br>อ.'+esc(b.dist)+'<br><small style="font-weight:400">'+esc(b.codes.join(', '))+'</small>',t:'จุดความร้อน อ.'+b.dist,v:b.vals,dist:1})));
+  const f0=v=>v==null?'—':v.toLocaleString('en-US');
+  const mxh=Math.max(1,...tot.filter(x=>x!=null));
+  const sumC=c=>c.v.every(v=>v==null)?null:c.v.reduce((a,v)=>a+(v||0),0);
+  let h='<div class="tw" style="max-height:none"><table class="dt"><thead><tr><th class="c0">เดือน '+y+'</th>'+hcols.map(c=>'<th>'+c.h+'</th>').join('')+ST.map(s=>'<th>PM2.5 '+esc(s.code)+'<br><small style="font-weight:400">'+esc(s.province)+'</small></th>').join('')+'</tr></thead><tbody>'
+   +months.map((m,i)=>'<tr><td class="c0" style="font-family:inherit;text-align:left">'+MF[m]+'</td>'+hcols.map(c=>{const v=c.v[i];return'<td'+(v!=null?' style="background:rgba(181,83,47,'+(0.04+0.3*Math.min(1,v/mxh)).toFixed(2)+')"':'')+'>'+f0(v)+'</td>';}).join('')+lines.map(l=>{const v=l.vals[i];return'<td'+(v!=null?' style="'+shadePM(v)+'"':'')+'>'+(v==null?'—':v.toFixed(1))+'</td>';}).join('')+'</tr>').join('')
+   +'<tr style="font-weight:700"><td class="c0" style="font-family:inherit;text-align:left">รวม / เฉลี่ย</td>'+hcols.map(c=>'<td>'+f0(sumC(c))+'</td>').join('')+lines.map(l=>{const v=l.vals.filter(x=>x!=null);return'<td>'+(v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):'—')+'</td>';}).join('')+'</tr></tbody></table></div>'
+   +'<p class="note">จุดความร้อน = จำนวนจุดในพื้นที่ป่า (ป่าสงวนฯ + ป่าอนุรักษ์) รายเดือน ของจังหวัดที่สถานีตั้งอยู่'+(dbars.length?' และของอำเภอที่สถานีตั้งอยู่ (อำเภออยู่ในจังหวัด จึงไม่รวมเป็นยอดจังหวัดซ้ำ)':' · <b>ยังไม่มีข้อมูลระดับอำเภอ</b> ใส่ใน data/hotspot3_amphoe.js แล้วแท่งอำเภอ (เมืองเชียงใหม่, เมืองลำพูน, ลี้) จะขึ้นเอง')+' · "—" = ยังไม่มีข้อมูล · แถวรวม: จุดความร้อนเป็นผลรวม, PM2.5 เป็นค่าเฉลี่ยของเดือนที่มีข้อมูล</p>';
   $('hp-table').innerHTML=h;
-  hpT=[['เดือน'].concat(bars.map(b=>'จุดความร้อน จ.'+b.prov),['จุดความร้อนรวม'],lines.map(l=>l.label+' (µg/m³)'))].concat(rowsT.map(r=>r.map((v,k)=>v==null?'':(k>1+bars.length?+(+v).toFixed(2):v))));
+  hpT=[['เดือน'].concat(hcols.map(c=>c.t),lines.map(l=>l.label+' (µg/m³)'))].concat(months.map((m,i)=>[MF[m]].concat(hcols.map(c=>c.v[i]==null?'':c.v[i]),lines.map(l=>l.vals[i]==null?'':+l.vals[i].toFixed(2)))));
 }
 $('hp-tcsv').onclick=()=>{if(hpT)dlCSV(hpT,'hotspot_vs_pm25_table.csv');};
 $('hp-sat').addEventListener('change',renderHp);
@@ -1400,20 +1409,22 @@ document.querySelectorAll('#cmp-nav button').forEach(b=>b.addEventListener('clic
 /* ----- เทียบกับสถานี คพ. ----- */
 let pcRows=[];
 function renderPcd(){
-  const body=$('pc-body'),y=Y1,P=window.PCD3&&PCD3.stations||{};
-  const GR=[{prov:'เชียงใหม่',ours:['CM'],pcd:['36t','35t']},{prov:'ลำพูน',ours:['LP','LI'],pcd:['68t']}];
-  const pn=c=>Object.keys((P[c]||{}).daily||{}).length;
-  const hasAny=['35t','36t','68t'].some(c=>pn(c)>0);
+  const body=$('pc-body'),y=Y1,PD=window.PM25_DAILY||{};
+  /* ข้อมูลสถานี คพ. อ่านจากไฟล์ข้อมูลรายวันปกติ (data/daily/<รหัส>.js) ที่อัปเดตผ่านหลังบ้าน */
+  const pdv=(c,m,d)=>{const a=PD[c]&&PD[c][y]&&PD[c][y][m];return a&&a[d]!=null?a[d]:null;};
+  const GR=[{prov:'เชียงใหม่',ours:['CM'],pcd:['36t','35t']},{prov:'ลำพูน',ours:['LP','LI'],pcd:['68t','o73']}];
+  const pn=c=>{const a=PD[c]&&PD[c][y];let n=0;if(a)a.forEach(mo=>mo.forEach(v=>{if(v!=null)n++;}));return n;};
+  const hasAny=GR.some(g=>g.pcd.some(c=>pn(c)>0));
   pcRows=[];
-  if(!hasAny){body.innerHTML='<p class="note" style="margin-top:10px">ยังไม่มีข้อมูลสถานี คพ. ปี '+y+' (35t, 36t, 68t) ในไฟล์ <b>data/pcd2026.js</b> — ใส่ค่า PM2.5 รายวันของสามสถานีนี้ลงไป หน้านี้จะแสดงกราฟเทียบ ตารางความต่าง และส่งออกข้อมูลให้อัตโนมัติ<br>รูปแบบ: <code>"36t":{"daily":{"2026-03-01":23.4,"2026-03-02":25.1}}</code></p>';return;}
+  if(!hasAny){body.innerHTML='<p class="note" style="margin-top:10px">ยังไม่มีข้อมูลสถานี คพ. ปี '+y+' (36t, 35t, 68t, o73) — นำเข้าข้อมูลรายวันปี '+y+' ของสถานีเหล่านี้ที่หลังบ้าน แล้วหน้านี้จะแสดงกราฟเทียบให้อัตโนมัติ</p>';return;}
   const mode=$('pc-mode').value;
-  const pcCol={'36t':'#222222','35t':'#7a7a7a','68t':'#222222'};
+  const pcCol={'36t':'#222222','35t':'#7a7a7a','68t':'#222222','o73':'#7a7a7a'};
   let h='';
   GR.forEach((g,gi)=>{
     const ours=g.ours.map(c=>ST.findIndex(s=>s.code===c)).filter(i=>i>=0);
     const defs=[];
     ours.forEach(i=>defs.push({code:ST[i].code,label:ST[i].code+' ('+ST[i].province+')',color:stCol(ST[i],i),dash:'',shape:stShape(i),get:(m,d)=>{const q=SER['S:'+ST[i].code];const a=q&&q[y]&&q[y][m];return a&&a[d]!=null?a[d]:null;}}));
-    g.pcd.forEach((c,k)=>defs.push({code:c,label:c+' (คพ.)',color:pcCol[c],dash:k?'3 3':'6 3',shape:k?3:1,pcd:1,get:(m,d)=>{const v=((P[c]||{}).daily||{})[dIso(y,m,d)];return v==null?null:+v;}}));
+    g.pcd.forEach((c,k)=>defs.push({code:c,label:c+' (คพ.)',color:pcCol[c]||'#555555',dash:k?'3 3':'6 3',shape:k?3:1,pcd:1,get:(m,d)=>pdv(c,m,d)}));
     const rows=[];
     for(let m=0;m<12;m++){const nd=dim(y,m+1);for(let d=0;d<nd;d++){
       const vals=defs.map(f=>{const v=f.get(m,d);return v==null||isNaN(v)?null:+v;});
@@ -1583,7 +1594,7 @@ switchSet(hm&&SETS.some(s=>s.id===hm[1])?hm[1]:SETS[0].id,hm?hm[2]:'map');
     if(!left)return run();
     codes.forEach(function(c){load('data/daily/'+encodeURIComponent(c)+'.js',function(){if(--left===0)run();});});
   }
-  load('data/config.js',stage2);load('data/geo.js',stage2);load('data/hotspot3.js',stage2);load('data/pcd2026.js',stage2);
+  load('data/config.js',stage2);load('data/geo.js',stage2);load('data/hotspot3.js',stage2);load('data/hotspot3_amphoe.js',stage2);
 })();
 </script>
 </body>

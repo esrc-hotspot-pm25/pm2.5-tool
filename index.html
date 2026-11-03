@@ -480,9 +480,11 @@ function buildGroups(){
 }
 const groupNote=e=>'กลุ่ม "'+e.label+'" = '+(GMETHOD==='station'?'เฉลี่ยของสถานีที่เลือก':'เฉลี่ยของจังหวัด (น้ำหนักเท่ากัน)')+' · จังหวัด ('+e.provsEff.length+'): '+e.provsEff.join(', ')+' · สถานี ('+e.codes.length+'): '+e.codes.join(', ')+' · แสดงเมื่ออย่างน้อย 80% ของจังหวัดมีข้อมูลผ่านเกณฑ์';
 const groupStationsTxt=()=>ENT.filter(e=>e.type==='gr').map(e=>e.label+' ใช้ '+e.codes.length+' สถานี ('+e.codes.join(', ')+')').join(' · ');
+const REFC=['35t','o73'];
 function loadSet(id){
   DS=SETS.find(s=>s.id===id)||SETS[0];
-  ST=DB.stations.filter(s=>(s.set||'k11')===DS.id);STM={};ST.forEach(s=>STM[s.code]=s);
+  /* สถานี คพ. อ้างอิงที่เก็บไว้ในชุด 3 สถานี (35t, o73) ใช้เฉพาะหน้า "เทียบกับสถานี คพ." ไม่นับเป็นสถานีหลักของชุด */
+  ST=DB.stations.filter(s=>(s.set||'k11')===DS.id&&!(DS.id==='s3'&&REFC.indexOf(s.code)>=0));STM={};ST.forEach(s=>STM[s.code]=s);
   PROVS=[];ST.forEach(s=>{if(PROVS.indexOf(s.province)<0)PROVS.push(s.province);});
   ENT=[];
   PROVS.forEach(p=>ENT.push({id:'P:'+p,label:p,type:'pv',sub:'จังหวัด',codes:ST.filter(s=>s.province===p).map(s=>s.code),color:provColor(p)}));

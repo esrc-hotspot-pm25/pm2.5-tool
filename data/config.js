@@ -22,7 +22,7 @@ window.PM25_CFG={
    "sub": "กรมควบคุมมลพิษ",
    "years": [
     2012,
-    2026
+    2025
    ],
    "minCoverage": 0.75,
    "sampled": false,
@@ -85,15 +85,6 @@ window.PM25_CFG={
    "lat": 18.791,
    "lon": 98.988,
    "rep": true
-  },
-  {
-   "code": "35t",
-   "set": "k11",
-   "location": "อ.เมืองเชียงใหม่",
-   "province": "เชียงใหม่",
-   "lat": 18.788,
-   "lon": 98.994,
-   "rep": false
   },
   {
    "code": "57t",
@@ -213,8 +204,17 @@ window.PM25_CFG={
    "rep": false
   },
   {
+   "code": "35t",
+   "set": "s3",
+   "location": "อ.เมืองเชียงใหม่",
+   "province": "เชียงใหม่",
+   "lat": 18.788,
+   "lon": 98.994,
+   "rep": false
+  },
+  {
    "code": "o73",
-   "set": "k11",
+   "set": "s3",
    "location": "อ.ลี้",
    "province": "ลำพูน",
    "lat": 17.8,

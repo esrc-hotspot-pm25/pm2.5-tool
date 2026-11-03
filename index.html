@@ -299,7 +299,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 22px 30px;font-size:12.5px;color
   <nav class="subnav" id="cmp-nav" aria-label="หัวข้อเทียบสถานี">
     <button data-sub="a" class="on"><b>เทียบ 3 สถานี</b><small>ค่าที่ตรงกัน · สูงสุด–ต่ำสุด</small></button>
     <button data-sub="b"><b>จุดความร้อนเทียบกับ 3 สถานี</b><small>แท่งจุดความร้อน · เส้น PM2.5</small></button>
-    <button data-sub="c"><b>3 สถานีเทียบกับสถานี คพ.</b><small>เชียงใหม่ 36t · 35t / ลำพูน 68t / ลี้ o73</small></button>
+    <button data-sub="c"><b>3 สถานีเทียบกับสถานี คพ.</b><small>เชียงใหม่ 36t · 35t / ลำพูน 68t / ลี้ 68t · o73</small></button>
   </nav>
   <div class="subbody">
 <div id="cmp-a">
@@ -330,7 +330,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 22px 30px;font-size:12.5px;color
 <div id="cmp-c" style="display:none">
   <div class="card">
     <h2>3 สถานีเทียบกับสถานี คพ.</h2>
-    <p class="note" style="margin:4px 0 0">เชียงใหม่: CM เทียบ 36t และ 35t · ลำพูน: LP เทียบ 68t · ลี้: LI เทียบ o73</p>
+    <p class="note" style="margin:4px 0 0">เชียงใหม่: CM เทียบ 36t และ 35t · ลำพูน: LP เทียบ 68t · ลี้: LI เทียบ 68t (คพ.ลำพูน) และ o73 (คพ.ลี้)</p>
     <div class="bar" style="margin-top:8px">
       <label>ข้อมูลที่ใช้ <select id="pc-mode"><option value="all">ทั้งหมด</option><option value="match">วันที่มีค่าครบทุกสถานีในกราฟ</option></select></label>
       <button class="btn" id="pc-csv">ส่งออก CSV รายวัน</button>
@@ -1414,7 +1414,7 @@ function renderPcd(){
   const body=$('pc-body'),y=Y1,PD=window.PM25_DAILY||{};
   /* ข้อมูลสถานี คพ. อ่านจากไฟล์ข้อมูลรายวันปกติ (data/daily/<รหัส>.js) ที่อัปเดตผ่านหลังบ้าน */
   const pdv=(c,m,d)=>{const a=PD[c]&&PD[c][y]&&PD[c][y][m];return a&&a[d]!=null?a[d]:null;};
-  const GR=[{prov:'เชียงใหม่',name:'จ.เชียงใหม่ (อ.เมือง)',ours:['CM'],pcd:['36t','35t']},{prov:'ลำพูน',name:'จ.ลำพูน (อ.เมือง)',ours:['LP'],pcd:['68t']},{prov:'ลำพูน',name:'อ.ลี้ จ.ลำพูน',ours:['LI'],pcd:['o73']}];
+  const GR=[{prov:'เชียงใหม่',name:'จ.เชียงใหม่ (อ.เมือง)',ours:['CM'],pcd:['36t','35t']},{prov:'ลำพูน',name:'จ.ลำพูน (อ.เมือง)',ours:['LP'],pcd:['68t']},{prov:'ลำพูน',name:'อ.ลี้ จ.ลำพูน',ours:['LI'],pcd:['68t','o73']}];
   const pn=c=>{const a=PD[c]&&PD[c][y];let n=0;if(a)a.forEach(mo=>mo.forEach(v=>{if(v!=null)n++;}));return n;};
   const hasAny=GR.some(g=>g.pcd.some(c=>pn(c)>0));
   pcRows=[];
@@ -1454,12 +1454,12 @@ function renderPcd(){
       t+='<tr><td class="c0" style="font-family:inherit;text-align:left"><b>'+esc(fa.code)+'</b> เทียบ <b>'+esc(fb.code)+'</b></td><td>'+n+'</td><td>'+mx.toFixed(1)+'</td><td>'+my.toFixed(1)+'</td><td><b>'+sgn(mx-my)+'</b></td><td>'+(ae/n).toFixed(1)+'</td><td>'+(r==null?'—':r.toFixed(2))+'</td></tr>';
     });
     h+='<div class="tw" style="max-height:none;margin-top:10px"><table class="dt"><thead><tr><th class="c0">คู่สถานี</th><th>จำนวนวันที่เทียบได้ '+tipI('นับวันที่ทั้งสองสถานีมีค่า PM2.5 พร้อมกัน')+'</th><th>เฉลี่ยของเรา (µg/m³)</th><th>เฉลี่ย คพ. (µg/m³)</th><th>ต่างกันเฉลี่ย (เรา − คพ.) '+tipI('1) หาผลต่างรายวัน = ค่าของเรา − ค่า คพ.\n2) เฉลี่ยผลต่างทุกวันที่เทียบได้\nบวก = สถานีของเราอ่านสูงกว่า')+'</th><th>ต่างสัมบูรณ์เฉลี่ย '+tipI('เฉลี่ยของ |ค่าของเรา − ค่า คพ.| รายวัน บอกขนาดความต่างโดยไม่สนทิศทาง')+'</th><th>สหสัมพันธ์ r '+tipI('Pearson r ของค่ารายวันสองสถานี ใกล้ 1 = ขึ้นลงตามกัน')+'</th></tr></thead><tbody>'+t+'</tbody></table></div>';
-    rows.forEach(r=>pcRows.push([g.prov,dIso(r.y,r.m,r.d)].concat(defs.map((f,i)=>({c:f.code,v:r.vals[i]})))));
+    rows.forEach(r=>pcRows.push([g.name,dIso(r.y,r.m,r.d)].concat(defs.map((f,i)=>({c:f.code,v:r.vals[i]})))));
   });
   body.innerHTML=h+'<p class="note">เทียบเฉพาะวันที่ทั้งคู่มีค่า · ใช้ทุกค่าที่มี ไม่ตัดตามเกณฑ์ข้อมูล</p>';syncTb();
 }
 $('pc-mode').addEventListener('change',renderPcd);
-$('pc-csv').onclick=()=>{if(!pcRows.length)return;const codes=[...new Set(pcRows.flatMap(r=>r.slice(2).map(x=>x.c)))];dlCSV([['จังหวัด','วันที่'].concat(codes)].concat(pcRows.map(r=>[r[0],r[1]].concat(codes.map(c=>{const x=r.slice(2).find(q=>q.c===c);return x&&x.v!=null?+(+x.v).toFixed(2):'';})))),'pm25_vs_pcd_'+Y1+'.csv');};
+$('pc-csv').onclick=()=>{if(!pcRows.length)return;const codes=[...new Set(pcRows.flatMap(r=>r.slice(2).map(x=>x.c)))];dlCSV([['กราฟ','วันที่'].concat(codes)].concat(pcRows.map(r=>[r[0],r[1]].concat(codes.map(c=>{const x=r.slice(2).find(q=>q.c===c);return x&&x.v!=null?+(+x.v).toFixed(2):'';})))),'pm25_vs_pcd_'+Y1+'.csv');};
 const RENDER={map:renderMap,conc:renderConc,exc:renderExc,cmp:renderCmp,bl:renderBl,tr:renderTr};
 const PAGEN={map:'แผนที่',conc:'ความเข้มข้น',exc:'วันที่เกินมาตรฐาน',cmp:'เทียบสถานี',bl:'Baseline',tr:'กราฟและส่งออกข้อมูล'};
 let CUR='map';

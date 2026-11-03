@@ -368,6 +368,7 @@ footer{max-width:1440px;margin:0 auto;padding:0 22px 30px;font-size:12.5px;color
       <label id="t-lw">ระดับข้อมูล <select id="t-lvl"><option value="all">ภาพรวมทุกสถานี</option><option value="grp">กลุ่มจังหวัด (8 / 9 จังหวัด)</option><option value="prov">รายจังหวัด</option><option value="st">รายสถานี</option></select></label>
       <label id="t-ew">พื้นที่ <select id="t-ent"></select></label>
       <label id="t-y0w">ตั้งแต่ปี <select id="t-y0"></select> ถึง <select id="t-y1"></select></label>
+      <label id="t-byw">ปีฐานเทียบ % <select id="t-by"></select></label>
       <label id="t-yw">ปี <select id="t-yr"></select></label>
     </div>
     <div class="blpick"></div>
@@ -377,6 +378,8 @@ footer{max-width:1440px;margin:0 auto;padding:0 22px 30px;font-size:12.5px;color
       <label><input type="checkbox" id="t-std" checked> เส้นมาตรฐาน (ค่าเฉลี่ย/สูงสุด)</label>
       <label><input type="checkbox" id="t-roni" checked> แถบ RONI</label>
       <label><input type="checkbox" id="t-lab" checked> ตัวเลขบนกราฟ</label>
+      <label id="t-pctw"><input type="checkbox" id="t-pct" checked> ลูกศร % เทียบปีฐาน</label>
+      <label id="t-excw"><input type="checkbox" id="t-exc" checked> แผงวันเกินมาตรฐานแต่ละปี</label>
     </div>
     <div class="figtb" data-key="t"></div>
     <div class="figure" id="t-fig"></div>
@@ -1123,11 +1126,14 @@ function renderBl(){
    ========================================================= */
 const FONTW=null;
 function chartYear(o){
-  const st=sty(),W=960,L=74,R=40,ch=330,B=84,key='t',met=o.met;
+  const st=sty(),W=960,L=74,ch=330,B=o.showExc?256:84,key='t',met=o.met;
   const pts=o.yrs.map(y=>({lab:String(y),y,v:val(o.ent,y,o.ms,met)}));
   const bl=o.noBL?{n:0}:blStats(o.ent,met);
   const vv=pts.filter(p=>p.v!=null);
-  let chg='';if(vv.length>=2){const a=vv[0],b=vv[vv.length-1];if(a.v){const c=(b.v-a.v)/a.v*100;chg='เปลี่ยนแปลง '+a.y+'→'+b.y+': '+(c>0?'+':'')+c.toFixed(1)+'%';}}
+  /* % เปลี่ยนแปลงเทียบปีฐาน: ปีฐาน = o.by (ค่าเริ่มต้น = ปีแรกที่มีค่า) → ปีสุดท้ายที่มีค่า */
+  let chg='',pc=null;
+  {const a=vv.find(p=>p.y===o.by)||vv[0],b=vv[vv.length-1];if(a&&b&&b.y>a.y&&a.v){const c=(b.v-a.v)/a.v*100;pc={a,b,c};chg=(c<0?'ลดลง ':c>0?'เพิ่มขึ้น ':'ไม่เปลี่ยน ')+Math.abs(c).toFixed(1)+'% เทียบปี '+a.y+' ('+a.y+'→'+b.y+')';}}
+  const R=(o.showPct&&pc)?150:40;
   const title=METN[met]+' — '+ENTM[o.ent].label+(ENTM[o.ent].type==='st'?' ('+ENTM[o.ent].sub+')':'');
   const sub='Baseline: '+blLabel()+(bl.n?' · ปีที่ใช้ '+bl.years.join(', ')+' · Mean='+fmt(bl.mean,met)+(bl.sd!=null?' SD='+fmt(bl.sd,met):'')+' (n='+bl.n+')':' · ไม่มีข้อมูล baseline')+(o.ms?' · เดือน '+monthsLabel(o.ms):'');
   const items=[{k:'mline',c:st.val,shape:0,t:'ค่าจริง'}];
@@ -1136,7 +1142,7 @@ function chartYear(o){
   if(o.showStd)items.push({k:'line',c:st.thc,d:'6 4',t:'มาตรฐานไทย '+TH},{k:'line',c:st.whoc,d:'6 4',t:'WHO '+WHO});
   if(o.showR){items.push({k:'box',c:st.ronEN[0],o:st.ronEN[1]+(st.shapes?0.25:.18),stroke:st.shapes?'#888':'',t:'El Niño'});items.push({k:'box',c:st.ronLN[0],o:st.ronLN[0].indexOf('url')===0?1:st.ronLN[1]+.18,stroke:st.shapes?'#888':'',t:'La Niña'});}
   const notes=['แหล่งข้อมูล: '+DS.source,'SD = ส่วนเบี่ยงเบนมาตรฐานตัวอย่าง (n−1)','ใช้เฉพาะปีที่'+covTxt(),o.showR?'RONI ช่วง'+RSEAN[RSEA]+' (EN > +0.5, LN < −0.5)':'',ENTM[o.ent].type==='gr'?groupNote(ENTM[o.ent]):''];
-  const f=frame(st,{W,L,R,B,ch,title,sub,items,notes,right:chg});
+  const f=frame(st,{W,L,R,B,ch,title,sub,items,notes,right:(o.showPct&&pc)?'':chg});
   let max=Math.max(0,...vv.map(p=>p.v));
   if(bl.n){if(o.showMean)max=Math.max(max,bl.mean);if(o.showSD&&bl.up!=null)max=Math.max(max,bl.up);}
   if(o.showStd)max=Math.max(max,TH);
@@ -1154,8 +1160,45 @@ function chartYear(o){
   pts.forEach((p,i)=>{s+=T_(st,X(i).toFixed(1),f.T+ch+20,p.lab,{anchor:'middle',sz:12,fill:p.v==null?'#aaa':st.text});if(st.frame)s+='<line x1="'+X(i).toFixed(1)+'" x2="'+X(i).toFixed(1)+'" y1="'+(f.T+ch)+'" y2="'+(f.T+ch-5)+'" stroke="'+st.axis+'"/>';
     const r=ron(p.y);if(o.showR&&r)s+=T_(st,X(i).toFixed(1),f.T+ch+36,rabbr(p.y),{anchor:'middle',sz:10,fill:r.cat==='El Nino'?'#6B1F2A':r.cat==='La Nina'?'#1F3A5F':'#777'});});
   s+=T_(st,18,f.T+ch/2,UNIT(met),{anchor:'middle',sz:12,rot:1});
+  /* ลูกศร + ตัวเลข % เทียบปีฐาน */
+  if(o.showPct&&pc){
+    const ia=pts.indexOf(pc.a),ib=pts.indexOf(pc.b),xa=X(ia),xb=X(ib),ya=Y(pc.a.v),yb=Y(pc.b.v),dn=pc.c<0,col=dn?'#0072B2':'#D55E00';
+    const ax=L+cw+26;
+    s+='<line x1="'+xa.toFixed(1)+'" x2="'+ax.toFixed(1)+'" y1="'+ya.toFixed(1)+'" y2="'+ya.toFixed(1)+'" stroke="'+col+'" stroke-width="1.4" stroke-dasharray="5 4"/>';
+    s+='<line x1="'+xb.toFixed(1)+'" x2="'+ax.toFixed(1)+'" y1="'+yb.toFixed(1)+'" y2="'+yb.toFixed(1)+'" stroke="'+col+'" stroke-width="1.2" stroke-dasharray="2 4"/>';
+    s+=mark(0,xa.toFixed(1),ya.toFixed(1),st.pr+1.5,'#fff',col,2);
+    const dir=yb>ya?1:-1,tip=9;
+    if(Math.abs(yb-ya)>4){
+      s+='<line x1="'+ax.toFixed(1)+'" x2="'+ax.toFixed(1)+'" y1="'+ya.toFixed(1)+'" y2="'+(yb-dir*tip).toFixed(1)+'" stroke="'+col+'" stroke-width="2.6"/>';
+      s+='<path d="M'+ax.toFixed(1)+','+yb.toFixed(1)+'L'+(ax-6.5).toFixed(1)+','+(yb-dir*tip).toFixed(1)+'L'+(ax+6.5).toFixed(1)+','+(yb-dir*tip).toFixed(1)+'Z" fill="'+col+'"/>';
+    }
+    const my=(ya+yb)/2;
+    s+=T_(st,(ax+13).toFixed(1),(my-6).toFixed(1),(dn?'▼ ลดลง':'▲ เพิ่มขึ้น'),{anchor:'start',sz:13,fill:col,bold:1});
+    s+=T_(st,(ax+13).toFixed(1),(my+12).toFixed(1),Math.abs(pc.c).toFixed(1)+'%',{anchor:'start',sz:20,fill:col,bold:1});
+    s+=T_(st,(ax+13).toFixed(1),(my+29).toFixed(1),'เทียบปี '+pc.a.y,{anchor:'start',sz:11.5,fill:col});
+    s+=hitC(ax,my,14,'<b>'+(dn?'ลดลง ':'เพิ่มขึ้น ')+Math.abs(pc.c).toFixed(1)+'% เทียบปี '+pc.a.y+'</b><br>'+pc.a.y+': '+fmt(pc.a.v,met)+' → '+pc.b.y+': '+fmt(pc.b.v,met)+' '+esc(UNIT(met))+'<br><span class="mu">คำนวณ: ('+fmt(pc.b.v,met)+' − '+fmt(pc.a.v,met)+') ÷ '+fmt(pc.a.v,met)+' × 100</span>');
+  }
+  /* แผงล่าง: จำนวนวันที่เกินมาตรฐานแต่ละปี (แท่งคู่ ไทย / WHO) */
+  const exc=o.showExc?pts.map(p=>({y:p.y,th:val(o.ent,p.y,o.ms,'th'),wh:val(o.ent,p.y,o.ms,'who')})):[];
+  if(o.showExc){
+    const pt=f.T+ch+86,ph=140,pb=pt+ph;let mx=0;exc.forEach(e=>{if(e.th!=null&&e.th>mx)mx=e.th;if(e.wh!=null&&e.wh>mx)mx=e.wh;});
+    const nt2=niceTicks(Math.max(1,mx)*1.18),top2=nt2.top,Y2=v=>pb-(v/top2)*ph;
+    s+=T_(st,L,pt-12,'จำนวนวันที่เกินมาตรฐานแต่ละปี (วัน)',{sz:13,bold:1});
+    s+='<rect x="'+(L+cw-330)+'" y="'+(pt-22)+'" width="12" height="12" fill="'+st.thc+'"/>'+T_(st,L+cw-313,pt-12,'เกิน '+TH+' µg/m³ (ไทย)',{sz:11.5,fill:st.sub});
+    s+='<rect x="'+(L+cw-160)+'" y="'+(pt-22)+'" width="12" height="12" fill="'+st.whoc+'"/>'+T_(st,L+cw-143,pt-12,'เกิน '+WHO+' µg/m³ (WHO)',{sz:11.5,fill:st.sub});
+    nt2.ticks.forEach(t=>{const y=Y2(t).toFixed(1);s+='<line x1="'+L+'" x2="'+(L+cw)+'" y1="'+y+'" y2="'+y+'" stroke="'+st.grid+'" stroke-width="1"'+(st.gridDash?' stroke-dasharray="'+st.gridDash+'"':'')+'/>'+T_(st,L-9,+y+4,String(Math.round(t)),{anchor:'end',sz:11,fill:st.text});});
+    s+='<line x1="'+L+'" x2="'+(L+cw)+'" y1="'+pb+'" y2="'+pb+'" stroke="'+st.axis+'"/>';
+    const bw2=Math.min(30,cw/N*.3);
+    exc.forEach((e,i)=>{const cx=X(i);
+      [['th',st.thc,-bw2-1,'ไทย'],['wh',st.whoc,1,'WHO']].forEach(q=>{const v=e[q[0]],x=cx+q[2];
+        if(v==null){s+=T_(st,(x+bw2/2).toFixed(1),pb-5,'–',{anchor:'middle',sz:11,fill:'#aaa'});return;}
+        const y=Y2(v);s+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw2.toFixed(1)+'" height="'+Math.max(0,pb-y).toFixed(1)+'" fill="'+q[1]+'"/>';
+        s+=T_(st,(x+bw2/2).toFixed(1),(y-4).toFixed(1),String(Math.round(v)),{anchor:'middle',sz:10.5,fill:st.text,bold:1});
+        s+=hitR(x,Math.min(y,pb-10),bw2,Math.max(pb-y,10),'<b>ปี '+e.y+'</b><br>วันที่เกิน'+(q[0]==='th'?'มาตรฐานไทย ('+TH+' µg/m³)':'เกณฑ์ WHO ('+WHO+' µg/m³)')+': <b>'+Math.round(v)+' วัน</b>');});
+      s+=T_(st,cx.toFixed(1),pb+17,String(e.y),{anchor:'middle',sz:12});});
+  }
   if(!vv.length)s+=T_(st,W/2,f.T+ch/2,'ไม่มีข้อมูลที่ผ่านเกณฑ์ในช่วงนี้',{anchor:'middle',sz:16,fill:'#999'});
-  const csv=[['ปี','RONI ('+RSEAN[RSEA]+')','ประเภท RONI',METS[met],'baseline_mean','baseline_sd','mean+sd','mean-sd','n_ปีที่ใช้ทำ_baseline','เดือนที่ใช้']].concat(pts.map(p=>{const r=ron(p.y)||{};return[p.y,r.v,r.type,p.v==null?'':+p.v.toFixed(3),bl.n?+bl.mean.toFixed(3):'',bl.sd!=null?+bl.sd.toFixed(3):'',bl.up!=null?+bl.up.toFixed(3):'',bl.dn!=null?+bl.dn.toFixed(3):'',bl.n||0,monthsLabel(o.ms)];}));
+  const csv=[['ปี','RONI ('+RSEAN[RSEA]+')','ประเภท RONI',METS[met],'baseline_mean','baseline_sd','mean+sd','mean-sd','n_ปีที่ใช้ทำ_baseline','เดือนที่ใช้','วันเกินมาตรฐานไทย','วันเกิน WHO','% เทียบปีฐาน'+(pc?' (ปี '+pc.a.y+')':'')]].concat(pts.map((p,pi)=>{const r=ron(p.y)||{};const ex=exc[pi]||{};const pv=pc&&p.v!=null&&p.y>=pc.a.y?+((p.v-pc.a.v)/pc.a.v*100).toFixed(2):'';return[p.y,r.v,r.type,p.v==null?'':+p.v.toFixed(3),bl.n?+bl.mean.toFixed(3):'',bl.sd!=null?+bl.sd.toFixed(3):'',bl.up!=null?+bl.up.toFixed(3):'',bl.dn!=null?+bl.dn.toFixed(3):'',bl.n||0,monthsLabel(o.ms),ex.th==null?'':ex.th,ex.wh==null?'':ex.wh,pv];}));
   return{svg:wrapSVG(key,W,f,s,HATCH),csv,name:'pm25_trend_'+met+'_'+o.ent.replace(':','-')};
 }
 function chartCat(o){
@@ -1198,10 +1241,12 @@ function chartCat(o){
 }
 function renderTr(){
   const xm=$('t-x').value,met=$('t-met').value;
-  $('t-lw').style.display=xm==='year'?'':'none';$('t-ew').style.display=xm==='year'?'':'none';$('t-y0w').style.display=xm==='year'?'':'none';$('t-yw').style.display=xm==='year'?'none':'';
+  $('t-lw').style.display=xm==='year'?'':'none';$('t-ew').style.display=xm==='year'?'':'none';$('t-y0w').style.display=xm==='year'?'':'none';['t-byw','t-pctw','t-excw'].forEach(id=>$(id).style.display=xm==='year'?'':'none');$('t-yw').style.display=xm==='year'?'none':'';
   const common={met,ms:mArg('bl'),noBL:!BL.years.size,showMean:$('t-mean').checked,showSD:$('t-sd').checked,showStd:$('t-std').checked&&isDec(met),showR:$('t-roni').checked,showLab:$('t-lab').checked};
   let r;
-  if(xm==='year'){const y0=+$('t-y0').value,y1=+$('t-y1').value;const ev=$('t-ent').value,ent=ENTM[ev]?ev:(($('t-ent').options[0]||{}).value||'ALL');r=chartYear(Object.assign(common,{ent,yrs:YEARS.filter(y=>y>=y0&&y<=y1)}));}
+  if(xm==='year'){const y0=+$('t-y0').value,y1=+$('t-y1').value;const ev=$('t-ent').value,ent=ENTM[ev]?ev:(($('t-ent').options[0]||{}).value||'ALL');const yrs=YEARS.filter(y=>y>=y0&&y<=y1);
+    {const cur=$('t-by').value,keep=yrs.map(String).indexOf(cur)>=0;$('t-by').innerHTML=yrs.map(y=>'<option value="'+y+'">'+y+'</option>').join('');$('t-by').value=keep?cur:String(yrs[0]);}
+    r=chartYear(Object.assign(common,{ent,yrs,by:+$('t-by').value,showPct:$('t-pct').checked,showExc:$('t-exc').checked}));}
   else r=chartCat(Object.assign(common,{xm,yr:+$('t-yr').value}));
   putFig('t',r,'t-fig');
 }
@@ -1562,7 +1607,7 @@ $('gstrip').addEventListener('change',e=>{const c=e.target.dataset.gc;if(!c)retu
 ['c-mode','c-y','c-sea','c-met','c-dt','c-fl'].forEach(id=>$(id).addEventListener('change',()=>{PGI=0;renderConc();}));
 ['e-std','e-mode','e-y','e-sea','e-fl'].forEach(id=>$(id).addEventListener('change',renderExc));
 ['b-met','b-view'].forEach(id=>$(id).addEventListener('change',renderBl));
-['t-x','t-met','t-ent','t-y0','t-y1','t-yr','t-mean','t-sd','t-std','t-roni','t-lab'].forEach(id=>$(id).addEventListener('change',renderTr));
+['t-x','t-met','t-ent','t-y0','t-y1','t-yr','t-by','t-pct','t-exc','t-mean','t-sd','t-std','t-roni','t-lab'].forEach(id=>$(id).addEventListener('change',renderTr));
 $('t-lvl').addEventListener('change',()=>{fillEnt();renderTr();});
 $('t-y0').addEventListener('change',()=>{if(+$('t-y0').value>+$('t-y1').value)$('t-y1').value=$('t-y0').value;renderTr();});
 $('t-y1').addEventListener('change',()=>{if(+$('t-y1').value<+$('t-y0').value)$('t-y0').value=$('t-y1').value;renderTr();});

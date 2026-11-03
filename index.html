@@ -764,7 +764,7 @@ function chartMulti(key,o){
   lines.forEach((sr,si)=>{
     let d='',pen=false;sr.vals.forEach((v,i)=>{if(v==null){pen=false;return;}d+=(pen?'L':'M')+X(i).toFixed(1)+','+Y(v).toFixed(1);pen=true;});
     if(d)s+='<path d="'+d+'" fill="none" stroke="'+sr.color+'" stroke-width="'+(sr.thick?st.lw+1:(sr.dash?1.5:st.lw))+'"'+(sr.dash?' stroke-dasharray="'+sr.dash+'"':'')+' stroke-linejoin="round" stroke-linecap="round" opacity="'+(sr.dash?.85:1)+'"/>';
-    if(N<=60)sr.vals.forEach((v,i)=>{if(v==null)return;s+=mark(st.shapes?(sr.shape||0):0,X(i).toFixed(1),Y(v).toFixed(1),N>16?2.6:(sr.dash?3:st.pr-1),sr.dash?'#fff':sr.color,sr.dash?sr.color:'#fff',sr.dash?1.3:1.2);});
+    sr.vals.forEach((v,i)=>{if(v==null)return;s+=mark(st.shapes?(sr.shape||0):0,X(i).toFixed(1),Y(v).toFixed(1),N>100?1.7:N>60?2.1:N>16?2.6:(sr.dash?3:st.pr-1),sr.dash?'#fff':sr.color,sr.dash?sr.color:'#fff',sr.dash?1.3:1.2);});
   });
   s+=T_(st,18,f.T+ch/2,o.ylabel,{anchor:'middle',sz:12,rot:1});
   if(o.xtitle)s+=T_(st,L+cw/2,f.T+ch+42,o.xtitle,{anchor:'middle',sz:12});

@@ -24,7 +24,7 @@ window.PM25_CFG={
     2012,
     2025
    ],
-   "minCoverage": 0.75,
+   "minCoverage": 0,
    "sampled": false,
    "source": "กรมควบคุมมลพิษ (ข้อมูลรายวัน 11 สถานี)",
    "note": ""

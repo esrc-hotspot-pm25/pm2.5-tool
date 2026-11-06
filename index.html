@@ -407,6 +407,8 @@ if(!DB||!Array.isArray(DB.stations)||!Array.isArray(DB.sets)||!window.GEO){showE
 if(DRAFT)$('draftbar').style.display='block';
 const GEO=window.GEO, PJ=GEO.proj;
 const TH=+DB.settings.th, WHO=+DB.settings.who;
+const ATH=+(DB.settings.thYear||15), AWHO=+(DB.settings.whoYear||5); /* เกณฑ์ค่าเฉลี่ยรายปี */
+const stdPair=ann=>ann?{th:ATH,who:AWHO,tl:'มาตรฐานไทย (รายปี) '+ATH,wl:'WHO (รายปี) '+AWHO}:{th:TH,who:WHO,tl:'มาตรฐานไทย (รายวัน) '+TH,wl:'WHO (รายวัน) '+WHO};
 const RONI=DB.roni||{};
 const SETS=DB.sets;
 const MS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -563,17 +565,19 @@ function resetMonths(){
 
 /* ---------- สีระดับ PM2.5 ---------- */
 const BOUNDS=[WHO,25,TH,75].sort((a,b)=>a-b);
+const ABOUNDS=[AWHO,ATH,25,TH].sort((a,b)=>a-b); /* ระดับสีสำหรับค่าเฉลี่ยรายปี */
 const PMC=['#1F5FA8','#2E7D4F','#D4A000','#D2691E','#A8201A'];
-const pmCat=v=>{const i=BOUNDS.findIndex(b=>v<=b);return i<0?4:i;};
+const pmCat=(v,ann)=>{const B=ann?ABOUNDS:BOUNDS,i=B.findIndex(b=>v<=b);return i<0?4:i;};
 const rgba=(hex,a)=>{const n=parseInt(hex.slice(1),16);return'rgba('+(n>>16)+','+((n>>8)&255)+','+(n&255)+','+a+')';};
 const seq=f=>{f=Math.max(0,Math.min(1,f));return'hsl('+(50-48*f).toFixed(0)+',85%,'+(62-22*f).toFixed(0)+'%)';};
-function legendPM(){
-  const lab=[];let prev=0;
-  BOUNDS.forEach((b,i)=>{lab.push(i===0?'≤ '+b.toFixed(1):(prev+0.1).toFixed(1)+'–'+b.toFixed(1));prev=b;});
+function legendPM(ann){
+  const lab=[];let prev=0;const BB=ann?ABOUNDS:BOUNDS;
+  BB.forEach((b,i)=>{lab.push(i===0?'≤ '+b.toFixed(1):(prev+0.1).toFixed(1)+'–'+b.toFixed(1));prev=b;});
   lab.push('> '+prev.toFixed(1));
-  return lab.map((l,i)=>'<span><i style="background:'+PMC[i]+'"></i>'+l+'</span>').join('')+'<small>µg/m³ (เส้นแบ่ง '+WHO+' = WHO, '+TH+' = มาตรฐานไทย)</small>';
+  return lab.map((l,i)=>'<span><i style="background:'+PMC[i]+'"></i>'+l+'</span>').join('')+(ann?'<small>µg/m³ · ค่าเฉลี่ยรายปี (เกณฑ์รายปี: '+AWHO+' = WHO, '+ATH+' = มาตรฐานไทย)</small>':'<small>µg/m³ (เส้นแบ่งรายวัน: '+WHO+' = WHO, '+TH+' = มาตรฐานไทย)</small>');
 }
 const shadePM=v=>'background:'+rgba(PMC[pmCat(v)],.3);
+const shadePMA=v=>'background:'+rgba(PMC[pmCat(v,true)],.3);
 const shadeCnt=max=>v=>'background:rgba(194,65,12,'+(0.05+0.5*Math.min(1,v/(max||1))).toFixed(2)+')';
 
 /* ---------- ตาราง ---------- */
@@ -650,11 +654,12 @@ function ensoTypes(){const s=new Set();Object.keys(RONI).forEach(y=>{const r=RON
 const BL={preset:'p2019',years:new Set()};
 function presetLabel(p){
   if(p==='all')return'ทุกปี '+Y0+'–'+Y1;if(p==='p2019')return'2019–'+Y1;if(p==='p2021')return'2021–'+Y1;if(p==='custom')return'กำหนดเอง';
-  if(p==='cat:El Nino')return'ปี El Niño (ทุกระดับ)';if(p==='cat:La Nina')return'ปี La Niña (ทุกระดับ)';if(p==='cat:Neutral')return'ปี Neutral';
+  if(p==='match')return'ตามสภาวะ ENSO ของแต่ละปี';if(p==='cat:El Nino')return'ปี El Niño (ทุกระดับ)';if(p==='cat:La Nina')return'ปี La Niña (ทุกระดับ)';if(p==='cat:Neutral')return'ปี Neutral';
   if(p.indexOf('type:')===0)return'ปี '+tn(p.slice(5));return p;
 }
 function applyPreset(p){
   BL.preset=p;if(p==='custom')return;
+  if(p==='match'){BL.years=new Set(YEARS);return;}
   BL.years=new Set(YEARS.filter(y=>{
     if(p==='all')return true;if(p==='p2019')return y>=2019;if(p==='p2021')return y>=2021;
     const r=ron(y);if(!r)return false;
@@ -664,7 +669,7 @@ function applyPreset(p){
 }
 function renderPickers(){
   const opt=(v,t)=>'<option value="'+esc(v)+'"'+(BL.preset===v?' selected':'')+'>'+esc(t)+'</option>';
-  let o='<optgroup label="ช่วงปี">'+opt('all',presetLabel('all'))+opt('p2019',presetLabel('p2019'))+opt('p2021',presetLabel('p2021'))+opt('custom','กำหนดเอง')+'</optgroup>'
+  let o='<optgroup label="ช่วงปี">'+opt('all',presetLabel('all'))+opt('p2019',presetLabel('p2019'))+opt('p2021',presetLabel('p2021'))+opt('custom','กำหนดเอง')+opt('match',presetLabel('match'))+'</optgroup>'
    +'<optgroup label="ประเภท ENSO (ตามช่วง RONI ที่เลือก)">'+opt('cat:El Nino',presetLabel('cat:El Nino'))+opt('cat:La Nina',presetLabel('cat:La Nina'))+opt('cat:Neutral',presetLabel('cat:Neutral'))
    +ensoTypes().map(t=>opt('type:'+t,'เฉพาะ '+tn(t))).join('')+'</optgroup>';
   const h='<div class="blhead"><label><b>Baseline</b> <select class="blsel">'+o+'</select></label>'
@@ -687,6 +692,10 @@ document.addEventListener('change',e=>{
   if(t.classList.contains('rsel')){RSEA=t.value;if(BL.preset!=='custom')applyPreset(BL.preset);renderPickers();refresh();}
 });
 const blLabel=()=>presetLabel(BL.preset);
+const ensoLab=y=>{const r=ron(y);return r?(r.cat==='El Nino'?'El Niño':r.cat==='La Nina'?'La Niña':'Neutral'):'ไม่มีข้อมูล RONI';};
+/* baseline ตามสภาวะ ENSO ของปีนั้น: ใช้เฉพาะปีที่อยู่ในประเภทเดียวกัน (El Niño / La Niña / Neutral) ตาม RONI ที่เลือก */
+function blStatsCat(id,met,y){const r=ron(y);if(!r)return{n:0};const pool=YEARS.filter(yy=>{const q=ron(yy);return q&&q.cat===r.cat;});const b=blStats(id,met,pool);b.cat=r.cat;return b;}
+function blStatsAll(id,met){return blStats(id,met,YEARS);}
 function blStats(id,met,yrs){
   yrs=yrs||[...BL.years].sort((a,b)=>a-b);const ms=mArg('bl');
   const vals=[];yrs.forEach(y=>{const v=val(id,y,ms,met);if(v!=null)vals.push({y,v});});
@@ -800,14 +809,15 @@ function chartMulti(key,o){
   const st=sty(),W=960,L=74,R=36,ch=330,B=58,N=o.xl.length||1;
   const lines=o.series;
   let max=0;lines.forEach(s=>s.vals.forEach(v=>{if(v!=null&&v>max)max=v;}));
-  if(o.std){max=Math.max(max,TH);}
+  const sp=stdPair(o.stdAnn);
+  if(o.std){max=Math.max(max,sp.th);}
   const nt=niceTicks(max*1.08),top=nt.top;
   const items=lines.map((s,i)=>({k:'mline',c:s.color,d:s.dash,shape:st.shapes?(s.shape||0):0,t:s.label}));
-  if(o.std)items.push({k:'line',c:st.thc,d:'6 4',t:'มาตรฐานไทย '+TH},{k:'line',c:st.whoc,d:'6 4',t:'WHO '+WHO});
+  if(o.std)items.push({k:'line',c:st.thc,d:'6 4',t:sp.tl},{k:'line',c:st.whoc,d:'6 4',t:sp.wl});
   const f=frame(st,{W,L,R,B,ch,title:o.title,sub:o.sub,items,notes:o.notes});
   const cw=W-L-R,X=i=>L+cw*(i+.5)/N,Y=v=>f.T+ch-(v/top)*ch;
   let s=axes(st,{L,T:f.T,cw,ch,ticks:nt.ticks,Y,tickFmt:tickF(o.met)});
-  if(o.std){[[TH,st.thc],[WHO,st.whoc]].forEach(a=>{if(a[0]<=top){const y=Y(a[0]).toFixed(1);s+='<line x1="'+L+'" x2="'+(L+cw)+'" y1="'+y+'" y2="'+y+'" stroke="'+a[1]+'" stroke-width="2.6" stroke-dasharray="8 5"/>';}});}
+  if(o.std){[[sp.th,st.thc],[sp.who,st.whoc]].forEach(a=>{if(a[0]<=top){const y=Y(a[0]).toFixed(1);s+='<line x1="'+L+'" x2="'+(L+cw)+'" y1="'+y+'" y2="'+y+'" stroke="'+a[1]+'" stroke-width="2.6" stroke-dasharray="8 5"/>';}});}
   const step=o.dots?Math.max(1,Math.ceil(N/16)):(N>20?2:1);
   o.xl.forEach((lb,i)=>{if(i%step===0){s+=T_(st,X(i).toFixed(1),f.T+ch+19,lb,{anchor:'middle',sz:o.dots?10.5:(N>12?10.5:12)});if(st.frame)s+='<line x1="'+X(i).toFixed(1)+'" x2="'+X(i).toFixed(1)+'" y1="'+(f.T+ch)+'" y2="'+(f.T+ch-5)+'" stroke="'+st.axis+'"/>';}});
   let hs='';
@@ -836,7 +846,7 @@ function figFromOpts(key,boxId,o,level){
       sers.push({label:e.label+' ('+e.sub+')',color:e.color,dash:lv==='both'?'4 3':(k%2?'6 3':''),vals:o.rows.map(r=>o.cell(r,e)),shape:(lv==='both'?pi:(pi+k))%4});});
   }
   const lvTxt=lv==='gr'?'ข้อมูลกลุ่มจังหวัด ('+ENT.filter(e=>e.type==='gr').map(g=>g.label).join(' / ')+')':lv==='pv'?'ข้อมูลรายจังหวัด':lv==='st'?'ข้อมูลรายสถานี':'ข้อมูลรายจังหวัด (เส้นทึบ) และรายสถานี (เส้นประ)';
-  const r=chartMulti(key,{title:o.title,sub:o.sub||'',notes:(o.figNotes||[]).concat([lvTxt]).concat(lv==='gr'?ENT.filter(e=>e.type==='gr').map(groupNote):[]),xl:o.rows.map(x=>x.short||x.label),xfull:o.rows.map(x=>x.full||x.label),xhead:o.corner,series:sers,met:o.met,std:o.std,ylabel:o.ylabel,xtitle:o.xtitle,dots:o.dots,name:o.name+'_'+lv});
+  const r=chartMulti(key,{title:o.title,sub:o.sub||'',notes:(o.figNotes||[]).concat([lvTxt]).concat(lv==='gr'?ENT.filter(e=>e.type==='gr').map(groupNote):[]),xl:o.rows.map(x=>x.short||x.label),xfull:o.rows.map(x=>x.full||x.label),xhead:o.corner,series:sers,met:o.met,std:o.std,stdAnn:o.ann,ylabel:o.ylabel,xtitle:o.xtitle,dots:o.dots,name:o.name+'_'+lv});
   putFig(key,r,boxId);
 }
 
@@ -911,7 +921,7 @@ function mctx(){
   const sea=$('m-sea').value,ms=mode==='year'?seasonArg(sea):(mode==='month'?mArg('map'):md);
   let dm=0;(ms==null?ALLM:(Array.isArray(ms)?ms:[ms])).forEach(m=>dm+=dim(y,m+1));
   if(mode==='day')dm=1;
-  return{mode,y,md,d,met,ms,dm,sea};
+  return{mode,y,md,d,met,ms,dm,sea,ann:mode==='year'&&sea==='all'&&met==='avg'};
 }
 function pval(id,c){
   if(c.mode==='day'){const s=SER[id]&&SER[id][c.y];const v=s&&s[c.md]?s[c.md][c.d]:null;return{v:v==null?null:v,st:null};}
@@ -922,10 +932,11 @@ function stInfo(code){
   const s=STM[code],c=mctx(),r=pval('S:'+code,c);
   let h='<b>'+esc(code)+'</b> · '+esc(s.location)+'<br><span class="mu">จ.'+esc(s.province)+' · '+esc(perLabel(c))+'</span><hr>';
   if(c.mode==='day'){
-    h+=r.v==null?'ไม่มีข้อมูลในวันนี้':'PM2.5 <b>'+r.v.toFixed(1)+'</b> µg/m³<br>'+(r.v>TH?'เกินมาตรฐานไทย':'ไม่เกินมาตรฐานไทย')+' · '+(r.v>WHO?'เกิน WHO':'ไม่เกิน WHO');
+    h+=r.v==null?'ไม่มีข้อมูลในวันนี้':'PM2.5 <b>'+r.v.toFixed(1)+'</b> µg/m³<br>'+(r.v>TH?'เกินมาตรฐานไทย':'ไม่เกินมาตรฐานไทย')+' ('+TH+' รายวัน) · '+(r.v>WHO?'เกิน WHO':'ไม่เกิน WHO')+' ('+WHO+' รายวัน)';
   }else{
     const st=r.st;
     h+='เฉลี่ย <b>'+f1(st.avg)+'</b> · สูงสุด '+f1(st.max)+' µg/m³<br>วันเกินไทย <b>'+st.th+'</b> วัน · วันเกิน WHO <b>'+st.who+'</b> วัน<br>มีข้อมูล '+st.n+'/'+st.dim+' วัน';
+    if(c.ann&&okStat(st))h+='<br>ค่าเฉลี่ยรายปี '+(st.avg>ATH?'<b>เกิน</b>':'ไม่เกิน')+'มาตรฐานไทย ('+ATH+') · '+(st.avg>AWHO?'<b>เกิน</b>':'ไม่เกิน')+' WHO ('+AWHO+')';
     if(!okStat(st))h+='<br><i class="mu">ต่ำกว่าเกณฑ์ข้อมูลครบ จึงไม่ระบายสี/ไม่แสดงค่า</i>';
   }
   return h;
@@ -939,8 +950,8 @@ function renderMap(){
   $('L-ct').style.display=$('m-ctry').checked?'':'none';$('L-cl').style.display=$('m-ctry').checked?'':'none';
   $('L-am').style.display=$('m-amp').checked?'':'none';$('L-an').style.display=$('m-an').checked?'':'none';$('L-pl').style.display=$('m-plb').checked?'':'none';
   const cnt=!isDec(c.met);
-  const colorOf=v=>cnt?seq(v/c.dm):PMC[pmCat(v)];
-  const txtOf=v=>cnt?(v/c.dm<0.35?'#16222d':'#fff'):(pmCat(v)===2||pmCat(v)===3?'#16222d':'#fff');
+  const colorOf=v=>cnt?seq(v/c.dm):PMC[pmCat(v,c.ann)];
+  const txtOf=v=>cnt?(v/c.dm<0.35?'#16222d':'#fff'):(pmCat(v,c.ann)===2||pmCat(v,c.ann)===3?'#16222d':'#fff');
   const pm=$('m-pfill').value;
   document.querySelectorAll('#L-pf .pf').forEach(el=>{
     el.style.fill='';el.style.fillOpacity='';const p=el.dataset.p;
@@ -960,9 +971,9 @@ function renderMap(){
   });
   $('L-st').innerHTML=g;
   $('m-pleg').innerHTML='<b style="font-size:12.5px">สีประจำจังหวัด:</b>'+PROVS.map(p=>'<span><i class="sq" style="background:'+provColor(p)+'"></i>'+esc(p)+' <small>'+esc(ST.filter(s=>s.province===p).map(s=>s.code).join(', '))+'</small></span>').join('');
-  $('m-legend').innerHTML=(cnt?'<span>ขนาดและสีแปรตามจำนวนวัน (เต็มสเกล = '+c.dm+' วัน)</span><span>0 <span class="grad" style="background:linear-gradient(90deg,'+seq(0)+','+seq(.5)+','+seq(1)+')"></span> '+c.dm+'</span>':legendPM())
+  $('m-legend').innerHTML=(cnt?'<span>ขนาดและสีแปรตามจำนวนวัน (เต็มสเกล = '+c.dm+' วัน)</span><span>0 <span class="grad" style="background:linear-gradient(90deg,'+seq(0)+','+seq(.5)+','+seq(1)+')"></span> '+c.dm+'</span>':legendPM(c.ann))
     +'<span><i style="background:none;border:1.5px dashed var(--mute)"></i>ไม่มีข้อมูล/ไม่ถึงเกณฑ์</span>';
-  const chip=v=>v==null?'<span class="chip2" style="color:var(--mute)">—</span>':'<span class="chip2" style="background:'+(cnt?seq(v/c.dm):PMC[pmCat(v)])+';color:'+txtOf(v)+'">'+fmt(v,c.met)+'</span>';
+  const chip=v=>v==null?'<span class="chip2" style="color:var(--mute)">—</span>':'<span class="chip2" style="background:'+(cnt?seq(v/c.dm):PMC[pmCat(v,c.ann)])+';color:'+txtOf(v)+'">'+fmt(v,c.met)+'</span>';
   let sh='<h2 style="margin:0 0 2px;font-size:16px">'+esc(perLabel(c))+'</h2><div class="note" style="margin:0">'+esc(c.mode==='day'?'PM2.5 รายวัน (µg/m³)':METN[c.met])+'</div>';
   ENT.filter(e=>e.type==='gr').forEach((e,i)=>{
     if(i===0)sh+='<div class="ph" style="--pc:#555"><span>ภาพรวมกลุ่มจังหวัด<small>ใช้สถานีตามแถบเลือกด้านบน</small></span></div>';
@@ -992,6 +1003,7 @@ function periodOpts(p){
   const met=isC?$('c-met').value:$('e-std').value;
   const key=isC?'conc':'exc',sel=msel(key),ms=mArg(key);
   const stdN=met==='th'?'มาตรฐานไทย (>'+TH+')':'WHO (>'+WHO+')';
+  const ann=isC&&met==='avg'&&mode==='year'&&$(p+'-sea').value==='all';
   const base={met,std:isC&&isDec(met)||isC,ylabel:isC?(met==='avg'?'PM2.5 เฉลี่ย (µg/m³)':'PM2.5 สูงสุดรายวัน (µg/m³)'):'จำนวนวัน เกิน'+(met==='th'?'มาตรฐานไทย':'WHO'),shade:null};
   let o;
   const covNote=covTxt();
@@ -1045,7 +1057,8 @@ function periodOpts(p){
     o.fname='pm25_'+(isC?'conc':'exceed')+'_seasonal_'+met+'.csv';
   }
   let mx=1;o.rows.forEach(r=>ENT.forEach(c=>{const v=o.cell(r,c);if(v!=null&&v>mx)mx=v;}));
-  o.fmt=v=>fmt(v,met);o.shade=isC?shadePM:shadeCnt(mx);o.std=isC&&isDec(met);
+  o.fmt=v=>fmt(v,met);o.shade=isC?(ann?shadePMA:shadePM):shadeCnt(mx);o.std=isC&&isDec(met);o.ann=ann;
+  if(ann)o.note+=' · เกณฑ์เทียบ: ค่าเฉลี่ยรายปี ไทย '+ATH+' / WHO '+AWHO+' µg/m³ (เกณฑ์รายวัน '+TH+' / '+WHO+' ใช้กับข้อมูลรายวัน)';
   if(ENT.some(e=>e.type==='gr'))o.note+=' · '+groupStationsTxt()+' · ค่ากลุ่ม = '+(GMETHOD==='station'?'เฉลี่ยของสถานีที่เลือก':'เฉลี่ยของจังหวัด (น้ำหนักเท่ากัน)')+' แสดงเมื่ออย่างน้อย 80% ของจังหวัดที่มีสถานีถูกเลือกมีข้อมูลผ่านเกณฑ์ · เปลี่ยนสถานีได้ที่แถบด้านบน';
   if(DS.sampled)o.note+=' · ชุดข้อมูลนี้เก็บตัวอย่างไม่ครบทุกวัน ค่าที่แสดงคำนวณจากวันที่มีตัวอย่างเท่านั้น';
   o.name=o.fname.replace(/\.csv$/,'');
@@ -1065,7 +1078,7 @@ function renderConc(){
   $('c-yw').style.display=mode==='year'?'none':'';$('c-metw').style.display=mode==='day'?'none':'';$('c-dtw').style.display=mode==='day'?'':'none';
   $('c-sw').style.display=mode==='year'?'':'none';$('c-mcw').style.display=mode==='year'?'none':'';
   concO=periodOpts('c');
-  $('c-legend').innerHTML='<b style="margin-right:6px">'+esc(concO.title)+'</b>'+legendPM();
+  $('c-legend').innerHTML='<b style="margin-right:6px">'+esc(concO.title)+'</b>'+legendPM(concO.ann);
   $('c-pager').innerHTML=mode==='day'?pagerHTML(concO):'';
   $('c-table').innerHTML=tbl(concO);$('c-note').textContent=concO.note;
   figFromOpts('c','c-fig',concO.figO||concO,$('c-fl').value);
@@ -1113,7 +1126,7 @@ function blOpts(){
 function renderBl(){
   blO=blOpts();const yrs=[...BL.years].sort((a,b)=>a-b),ms=mArg('bl');
   $('b-formula').innerHTML='<b>วิธีคำนวณ</b> ('+esc(METN[blO.met])+(ms?' · เฉพาะเดือน '+esc(monthsLabel(ms)):' · ทั้งปี')+')<br>'
-   +'1) เลือกปีที่ใช้เป็น baseline: <b>'+esc(blLabel())+'</b> = '+(yrs.length?yrs.join(', '):'ยังไม่ได้เลือกปี')+(BL.preset.indexOf('cat:')===0||BL.preset.indexOf('type:')===0?' (จัดประเภทตาม RONI ช่วง'+esc(RSEAN[RSEA])+')':'')+'<br>'
+   +'1) เลือกปีที่ใช้เป็น baseline: <b>'+esc(blLabel())+'</b> = '+(yrs.length?yrs.join(', '):'ยังไม่ได้เลือกปี')+(BL.preset==='match'?' — โหมดนี้มีผลเฉพาะกราฟหน้ากราฟและส่งออกข้อมูล (แต่ละปีเทียบกับปีสภาวะเดียวกัน) ตารางหน้านี้ใช้ทุกปี':'')+(BL.preset.indexOf('cat:')===0||BL.preset.indexOf('type:')===0?' (จัดประเภทตาม RONI ช่วง'+esc(RSEAN[RSEA])+')':'')+'<br>'
    +'2) แต่ละคอลัมน์ (จังหวัด/สถานี) ใช้เฉพาะปีที่'+esc(covTxt())+' → ได้ n ปี (ดูแถว n ด้านล่าง)<br>'
    +'3) Mean = Σx / n · SD = √[ Σ(x − Mean)² / (n − 1) ] (SD ตัวอย่าง ต้องมี n ≥ 2) · Mean ± SD ใช้เป็นช่วงปกติ (Mean − SD ไม่ต่ำกว่า 0)<br>'
    +'4) ในตาราง: แถวสีเหลืองคือปีที่ใช้คำนวณ · ตัวเลขสีไวน์ (แดงเข้ม) = สูงกว่า Mean + SD · สีกรมท่า = ต่ำกว่า Mean − SD';
@@ -1128,35 +1141,41 @@ const FONTW=null;
 function chartYear(o){
   const st=sty(),W=960,L=74,ch=330,B=o.showExc?256:84,key='t',met=o.met;
   const pts=o.yrs.map(y=>({lab:String(y),y,v:val(o.ent,y,o.ms,met)}));
-  const bl=o.noBL?{n:0}:blStats(o.ent,met);
+  const bl=o.noBL?{n:0}:(BL.preset==='match'?blStatsAll(o.ent,met):blStats(o.ent,met));
+  const match=!o.noBL&&BL.preset==='match';
+  const bls=match?pts.map(p=>blStatsCat(o.ent,met,p.y)):null;
+  const sp=stdPair(met==='avg');
   const vv=pts.filter(p=>p.v!=null);
   /* % เปลี่ยนแปลงเทียบปีฐาน: ปีฐาน = o.by (ค่าเริ่มต้น = ปีแรกที่มีค่า) → ปีสุดท้ายที่มีค่า */
   let chg='',pc=null;
   {const a=vv.find(p=>p.y===o.by)||vv[0],b=vv[vv.length-1];if(a&&b&&b.y>a.y&&a.v){const c=(b.v-a.v)/a.v*100;pc={a,b,c};chg=(c<0?'ลดลง ':c>0?'เพิ่มขึ้น ':'ไม่เปลี่ยน ')+Math.abs(c).toFixed(1)+'% เทียบปี '+a.y+' ('+a.y+'→'+b.y+')';}}
   const R=(o.showPct&&pc)?150:40;
   const title=METN[met]+' — '+ENTM[o.ent].label+(ENTM[o.ent].type==='st'?' ('+ENTM[o.ent].sub+')':'');
-  const sub='Baseline: '+blLabel()+(bl.n?' · ปีที่ใช้ '+bl.years.join(', ')+' · Mean='+fmt(bl.mean,met)+(bl.sd!=null?' SD='+fmt(bl.sd,met):'')+' (n='+bl.n+')':' · ไม่มีข้อมูล baseline')+(o.ms?' · เดือน '+monthsLabel(o.ms):'');
+  const sub='Baseline: '+blLabel()+(match?' · ใช้ค่าเฉลี่ย ± SD ของปีที่มีสภาวะ ENSO เดียวกับปีนั้น (RONI '+RSEAN[RSEA]+')':(bl.n?' · ปีที่ใช้ '+bl.years.join(', ')+' · Mean='+fmt(bl.mean,met)+(bl.sd!=null?' SD='+fmt(bl.sd,met):'')+' (n='+bl.n+')':' · ไม่มีข้อมูล baseline'))+(o.ms?' · เดือน '+monthsLabel(o.ms):'');
   const items=[{k:'mline',c:st.val,shape:0,t:'ค่าจริง'}];
   if(bl.n&&o.showMean)items.push({k:'line',c:st.base,d:st.shapes?'7 4':'',t:'Baseline Mean'});
   if(bl.n&&o.showSD&&bl.up!=null)items.push({k:'box',c:st.base,o:.22,t:'Mean ± 1 SD'});
-  if(o.showStd)items.push({k:'line',c:st.thc,d:'6 4',t:'มาตรฐานไทย '+TH},{k:'line',c:st.whoc,d:'6 4',t:'WHO '+WHO});
+  if(o.showStd)items.push({k:'line',c:st.thc,d:'6 4',t:sp.tl},{k:'line',c:st.whoc,d:'6 4',t:sp.wl});
   if(o.showR){items.push({k:'box',c:st.ronEN[0],o:st.ronEN[1]+(st.shapes?0.25:.18),stroke:st.shapes?'#888':'',t:'El Niño'});items.push({k:'box',c:st.ronLN[0],o:st.ronLN[0].indexOf('url')===0?1:st.ronLN[1]+.18,stroke:st.shapes?'#888':'',t:'La Niña'});}
   const notes=['แหล่งข้อมูล: '+DS.source,'SD = ส่วนเบี่ยงเบนมาตรฐานตัวอย่าง (n−1)','ใช้เฉพาะปีที่'+covTxt(),o.showR?'RONI ช่วง'+RSEAN[RSEA]+' (EN > +0.5, LN < −0.5)':'',ENTM[o.ent].type==='gr'?groupNote(ENTM[o.ent]):''];
   const f=frame(st,{W,L,R,B,ch,title,sub,items,notes,right:(o.showPct&&pc)?'':chg});
   let max=Math.max(0,...vv.map(p=>p.v));
-  if(bl.n){if(o.showMean)max=Math.max(max,bl.mean);if(o.showSD&&bl.up!=null)max=Math.max(max,bl.up);}
-  if(o.showStd)max=Math.max(max,TH);
+  (match?bls:[bl]).forEach(b=>{if(b&&b.n){if(o.showMean)max=Math.max(max,b.mean);if(o.showSD&&b.up!=null)max=Math.max(max,b.up);}});
+  if(o.showStd)max=Math.max(max,sp.th);
   const nt=niceTicks(max*1.08),top=nt.top,N=pts.length||1,cw=W-L-R;
   const X=i=>L+cw*(i+.5)/N,Y=v=>f.T+ch-(v/top)*ch;
   let s='';
   if(o.showR)pts.forEach((p,i)=>{const r=ron(p.y);if(!r||r.cat==='Neutral')return;const sp=r.cat==='El Nino'?st.ronEN:st.ronLN;s+='<rect x="'+(L+cw*i/N).toFixed(1)+'" y="'+f.T+'" width="'+(cw/N).toFixed(1)+'" height="'+ch+'" fill="'+sp[0]+'" opacity="'+sp[1]+'"/>';});
   s+=axes(st,{L,T:f.T,cw,ch,ticks:nt.ticks,Y,tickFmt:tickF(met)});
-  if(bl.n&&o.showSD&&bl.up!=null)s+='<rect x="'+L+'" y="'+Y(bl.up).toFixed(1)+'" width="'+cw+'" height="'+Math.max(0,Y(bl.dn)-Y(bl.up)).toFixed(1)+'" fill="'+st.base+'" opacity="'+st.band+'"/><line x1="'+L+'" x2="'+(L+cw)+'" y1="'+Y(bl.up).toFixed(1)+'" y2="'+Y(bl.up).toFixed(1)+'" stroke="'+st.base+'" stroke-width="1.1" stroke-dasharray="2 4" opacity=".8"/><line x1="'+L+'" x2="'+(L+cw)+'" y1="'+Y(bl.dn).toFixed(1)+'" y2="'+Y(bl.dn).toFixed(1)+'" stroke="'+st.base+'" stroke-width="1.1" stroke-dasharray="2 4" opacity=".8"/>';
-  if(o.showStd){[[TH,st.thc,'มาตรฐานไทย '+TH],[WHO,st.whoc,'WHO '+WHO]].forEach(a=>{if(a[0]>top)return;const y=Y(a[0]).toFixed(1);s+='<line x1="'+L+'" x2="'+(L+cw)+'" y1="'+y+'" y2="'+y+'" stroke="'+a[1]+'" stroke-width="2.6" stroke-dasharray="8 5"/>'+T_(st,L+cw-4,+y-6,a[2],{anchor:'end',sz:11.5,fill:a[1],bold:1,halo:1});});}
-  if(bl.n&&o.showMean){const y=Y(bl.mean).toFixed(1);s+='<line x1="'+L+'" x2="'+(L+cw)+'" y1="'+y+'" y2="'+y+'" stroke="'+st.base+'" stroke-width="'+(st.shapes?1.6:2.2)+'"'+(st.shapes?' stroke-dasharray="7 4"':'')+'/>';pts.forEach((p,i)=>s+='<circle cx="'+X(i).toFixed(1)+'" cy="'+y+'" r="3.8" fill="#fff" stroke="'+st.base+'" stroke-width="1.8"/>');s+=T_(st,L+cw-4,+y-8,'Baseline Mean '+fmt(bl.mean,met),{anchor:'end',sz:11,fill:st.base,bold:1,halo:1});}
+  if(match){pts.forEach((p,i)=>{const b=bls[i];if(!b.n)return;const x0=L+cw*i/N,x1=L+cw*(i+1)/N;
+    if(o.showSD&&b.up!=null)s+='<rect x="'+x0.toFixed(1)+'" y="'+Y(b.up).toFixed(1)+'" width="'+(x1-x0).toFixed(1)+'" height="'+Math.max(0,Y(b.dn)-Y(b.up)).toFixed(1)+'" fill="'+st.base+'" opacity="'+st.band+'"/><line x1="'+x0.toFixed(1)+'" x2="'+x1.toFixed(1)+'" y1="'+Y(b.up).toFixed(1)+'" y2="'+Y(b.up).toFixed(1)+'" stroke="'+st.base+'" stroke-width="1.1" stroke-dasharray="2 4" opacity=".8"/><line x1="'+x0.toFixed(1)+'" x2="'+x1.toFixed(1)+'" y1="'+Y(b.dn).toFixed(1)+'" y2="'+Y(b.dn).toFixed(1)+'" stroke="'+st.base+'" stroke-width="1.1" stroke-dasharray="2 4" opacity=".8"/>';});}
+  else if(bl.n&&o.showSD&&bl.up!=null)s+='<rect x="'+L+'" y="'+Y(bl.up).toFixed(1)+'" width="'+cw+'" height="'+Math.max(0,Y(bl.dn)-Y(bl.up)).toFixed(1)+'" fill="'+st.base+'" opacity="'+st.band+'"/><line x1="'+L+'" x2="'+(L+cw)+'" y1="'+Y(bl.up).toFixed(1)+'" y2="'+Y(bl.up).toFixed(1)+'" stroke="'+st.base+'" stroke-width="1.1" stroke-dasharray="2 4" opacity=".8"/><line x1="'+L+'" x2="'+(L+cw)+'" y1="'+Y(bl.dn).toFixed(1)+'" y2="'+Y(bl.dn).toFixed(1)+'" stroke="'+st.base+'" stroke-width="1.1" stroke-dasharray="2 4" opacity=".8"/>';
+  if(o.showStd){[[sp.th,st.thc,sp.tl],[sp.who,st.whoc,sp.wl]].forEach(a=>{if(a[0]>top)return;const y=Y(a[0]).toFixed(1);s+='<line x1="'+L+'" x2="'+(L+cw)+'" y1="'+y+'" y2="'+y+'" stroke="'+a[1]+'" stroke-width="2.6" stroke-dasharray="8 5"/>'+T_(st,L+cw-4,+y-6,a[2],{anchor:'end',sz:11.5,fill:a[1],bold:1,halo:1});});}
+  if(match){if(o.showMean)pts.forEach((p,i)=>{const b=bls[i];if(!b.n)return;const y=Y(b.mean).toFixed(1),x0=L+cw*i/N,x1=L+cw*(i+1)/N;s+='<line x1="'+x0.toFixed(1)+'" x2="'+x1.toFixed(1)+'" y1="'+y+'" y2="'+y+'" stroke="'+st.base+'" stroke-width="'+(st.shapes?2:2.6)+'"'+(st.shapes?' stroke-dasharray="7 4"':'')+'/>';});}
+  else if(bl.n&&o.showMean){const y=Y(bl.mean).toFixed(1);s+='<line x1="'+L+'" x2="'+(L+cw)+'" y1="'+y+'" y2="'+y+'" stroke="'+st.base+'" stroke-width="'+(st.shapes?1.6:2.2)+'"'+(st.shapes?' stroke-dasharray="7 4"':'')+'/>';pts.forEach((p,i)=>s+='<circle cx="'+X(i).toFixed(1)+'" cy="'+y+'" r="3.8" fill="#fff" stroke="'+st.base+'" stroke-width="1.8"/>');s+=T_(st,L+cw-4,+y-8,'Baseline Mean '+fmt(bl.mean,met),{anchor:'end',sz:11,fill:st.base,bold:1,halo:1});}
   let d='',pen=false;pts.forEach((p,i)=>{if(p.v==null){pen=false;return;}d+=(pen?'L':'M')+X(i).toFixed(1)+','+Y(p.v).toFixed(1);pen=true;});
   if(d)s+='<path d="'+d+'" fill="none" stroke="'+st.val+'" stroke-width="'+st.lw+'" stroke-linejoin="round" stroke-linecap="round"/>';
-  pts.forEach((p,i)=>{if(p.v==null)return;const cx=X(i).toFixed(1),cy=Y(p.v).toFixed(1);s+=hitC(cx,cy,9,'<b>ปี '+p.lab+'</b><br>'+esc(METN[met])+': <b>'+fmt(p.v,met)+'</b> '+esc(UNIT(met))+(bl.n?'<br><span class="mu">Baseline Mean '+fmt(bl.mean,met)+'</span>':''));s+=mark(0,cx,cy,st.pr,st.val,'#fff',1.4);if(o.showLab)s+=T_(st,cx,+cy-11,fmt(p.v,met),{anchor:'middle',sz:11,fill:st.val,bold:1,halo:1});});
+  pts.forEach((p,i)=>{if(p.v==null)return;const cx=X(i).toFixed(1),cy=Y(p.v).toFixed(1);s+=hitC(cx,cy,9,'<b>ปี '+p.lab+'</b><br>'+esc(METN[met])+': <b>'+fmt(p.v,met)+'</b> '+esc(UNIT(met))+(match?(bls[i].n?'<br><span class="mu">Baseline ('+esc(ensoLab(p.y))+', n='+bls[i].n+') Mean '+fmt(bls[i].mean,met)+(bls[i].sd!=null?' SD '+fmt(bls[i].sd,met):'')+'</span>':'<br><span class="mu">ไม่มี baseline (สภาวะ '+esc(ensoLab(p.y))+')</span>'):(bl.n?'<br><span class="mu">Baseline Mean '+fmt(bl.mean,met)+'</span>':'')));s+=mark(0,cx,cy,st.pr,st.val,'#fff',1.4);if(o.showLab)s+=T_(st,cx,+cy-11,fmt(p.v,met),{anchor:'middle',sz:11,fill:st.val,bold:1,halo:1});});
   pts.forEach((p,i)=>{s+=T_(st,X(i).toFixed(1),f.T+ch+20,p.lab,{anchor:'middle',sz:12,fill:p.v==null?'#aaa':st.text});if(st.frame)s+='<line x1="'+X(i).toFixed(1)+'" x2="'+X(i).toFixed(1)+'" y1="'+(f.T+ch)+'" y2="'+(f.T+ch-5)+'" stroke="'+st.axis+'"/>';
     const r=ron(p.y);if(o.showR&&r)s+=T_(st,X(i).toFixed(1),f.T+ch+36,rabbr(p.y),{anchor:'middle',sz:10,fill:r.cat==='El Nino'?'#6B1F2A':r.cat==='La Nina'?'#1F3A5F':'#777'});});
   s+=T_(st,18,f.T+ch/2,UNIT(met),{anchor:'middle',sz:12,rot:1});
@@ -1184,8 +1203,8 @@ function chartYear(o){
     const pt=f.T+ch+86,ph=140,pb=pt+ph;let mx=0;exc.forEach(e=>{if(e.th!=null&&e.th>mx)mx=e.th;if(e.wh!=null&&e.wh>mx)mx=e.wh;});
     const nt2=niceTicks(Math.max(1,mx)*1.18),top2=nt2.top,Y2=v=>pb-(v/top2)*ph;
     s+=T_(st,L,pt-12,'จำนวนวันที่เกินมาตรฐานแต่ละปี (วัน)',{sz:13,bold:1});
-    s+='<rect x="'+(L+cw-330)+'" y="'+(pt-22)+'" width="12" height="12" fill="'+st.thc+'"/>'+T_(st,L+cw-313,pt-12,'เกิน '+TH+' µg/m³ (ไทย)',{sz:11.5,fill:st.sub});
-    s+='<rect x="'+(L+cw-160)+'" y="'+(pt-22)+'" width="12" height="12" fill="'+st.whoc+'"/>'+T_(st,L+cw-143,pt-12,'เกิน '+WHO+' µg/m³ (WHO)',{sz:11.5,fill:st.sub});
+    s+='<rect x="'+(L+cw-410)+'" y="'+(pt-22)+'" width="12" height="12" fill="'+st.thc+'"/>'+T_(st,L+cw-393,pt-12,'เกิน '+TH+' µg/m³ (ไทย · รายวัน)',{sz:11.5,fill:st.sub});
+    s+='<rect x="'+(L+cw-195)+'" y="'+(pt-22)+'" width="12" height="12" fill="'+st.whoc+'"/>'+T_(st,L+cw-178,pt-12,'เกิน '+WHO+' µg/m³ (WHO · รายวัน)',{sz:11.5,fill:st.sub});
     nt2.ticks.forEach(t=>{const y=Y2(t).toFixed(1);s+='<line x1="'+L+'" x2="'+(L+cw)+'" y1="'+y+'" y2="'+y+'" stroke="'+st.grid+'" stroke-width="1"'+(st.gridDash?' stroke-dasharray="'+st.gridDash+'"':'')+'/>'+T_(st,L-9,+y+4,String(Math.round(t)),{anchor:'end',sz:11,fill:st.text});});
     s+='<line x1="'+L+'" x2="'+(L+cw)+'" y1="'+pb+'" y2="'+pb+'" stroke="'+st.axis+'"/>';
     const bw2=Math.min(30,cw/N*.3);
@@ -1194,32 +1213,33 @@ function chartYear(o){
         if(v==null){s+=T_(st,(x+bw2/2).toFixed(1),pb-5,'–',{anchor:'middle',sz:11,fill:'#aaa'});return;}
         const y=Y2(v);s+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw2.toFixed(1)+'" height="'+Math.max(0,pb-y).toFixed(1)+'" fill="'+q[1]+'"/>';
         s+=T_(st,(x+bw2/2).toFixed(1),(y-4).toFixed(1),String(Math.round(v)),{anchor:'middle',sz:10.5,fill:st.text,bold:1});
-        s+=hitR(x,Math.min(y,pb-10),bw2,Math.max(pb-y,10),'<b>ปี '+e.y+'</b><br>วันที่เกิน'+(q[0]==='th'?'มาตรฐานไทย ('+TH+' µg/m³)':'เกณฑ์ WHO ('+WHO+' µg/m³)')+': <b>'+Math.round(v)+' วัน</b>');});
+        s+=hitR(x,Math.min(y,pb-10),bw2,Math.max(pb-y,10),'<b>ปี '+e.y+'</b><br>วันที่เกิน'+(q[0]==='th'?'มาตรฐานไทยรายวัน ('+TH+' µg/m³)':'เกณฑ์ WHO รายวัน ('+WHO+' µg/m³)')+': <b>'+Math.round(v)+' วัน</b>');});
       s+=T_(st,cx.toFixed(1),pb+17,String(e.y),{anchor:'middle',sz:12});});
   }
   if(!vv.length)s+=T_(st,W/2,f.T+ch/2,'ไม่มีข้อมูลที่ผ่านเกณฑ์ในช่วงนี้',{anchor:'middle',sz:16,fill:'#999'});
-  const csv=[['ปี','RONI ('+RSEAN[RSEA]+')','ประเภท RONI',METS[met],'baseline_mean','baseline_sd','mean+sd','mean-sd','n_ปีที่ใช้ทำ_baseline','เดือนที่ใช้','วันเกินมาตรฐานไทย','วันเกิน WHO','% เทียบปีฐาน'+(pc?' (ปี '+pc.a.y+')':'')]].concat(pts.map((p,pi)=>{const r=ron(p.y)||{};const ex=exc[pi]||{};const pv=pc&&p.v!=null&&p.y>=pc.a.y?+((p.v-pc.a.v)/pc.a.v*100).toFixed(2):'';return[p.y,r.v,r.type,p.v==null?'':+p.v.toFixed(3),bl.n?+bl.mean.toFixed(3):'',bl.sd!=null?+bl.sd.toFixed(3):'',bl.up!=null?+bl.up.toFixed(3):'',bl.dn!=null?+bl.dn.toFixed(3):'',bl.n||0,monthsLabel(o.ms),ex.th==null?'':ex.th,ex.wh==null?'':ex.wh,pv];}));
+  const csv=[['ปี','RONI ('+RSEAN[RSEA]+')','ประเภท RONI',METS[met],'baseline_mean','baseline_sd','mean+sd','mean-sd','n_ปีที่ใช้ทำ_baseline','เดือนที่ใช้','วันเกินมาตรฐานไทย','วันเกิน WHO','% เทียบปีฐาน'+(pc?' (ปี '+pc.a.y+')':'')]].concat(pts.map((p,pi)=>{const r=ron(p.y)||{};const ex=exc[pi]||{};const pv=pc&&p.v!=null&&p.y>=pc.a.y?+((p.v-pc.a.v)/pc.a.v*100).toFixed(2):'';const bb=match?bls[pi]:bl;return[p.y,r.v,r.type,p.v==null?'':+p.v.toFixed(3),bb.n?+bb.mean.toFixed(3):'',bb.sd!=null?+bb.sd.toFixed(3):'',bb.up!=null?+bb.up.toFixed(3):'',bb.dn!=null?+bb.dn.toFixed(3):'',bb.n||0,monthsLabel(o.ms),ex.th==null?'':ex.th,ex.wh==null?'':ex.wh,pv];}));
   return{svg:wrapSVG(key,W,f,s,HATCH),csv,name:'pm25_trend_'+met+'_'+o.ent.replace(':','-')};
 }
 function chartCat(o){
   const st=sty(),W=960,L=74,R=40,ch=330,B=70,key='t',met=o.met,xm=o.xm;
   const list=xm==='prov'?ENT.filter(e=>e.type==='gr'||e.type==='pv'):ENT.filter(e=>e.type==='st');
-  const pts=list.map(e=>({e,lab:e.label,sub:xm==='st'?e.sub:'',v:val(e.id,o.yr,o.ms,met),bl:o.noBL?{n:0}:blStats(e.id,met)}));
+  const pts=list.map(e=>({e,lab:e.label,sub:xm==='st'?e.sub:'',v:val(e.id,o.yr,o.ms,met),bl:o.noBL?{n:0}:(BL.preset==='match'?blStatsCat(e.id,met,o.yr):blStats(e.id,met))}));
+  const sp=stdPair(met==='avg');
   const title=METN[met]+' — ปี '+o.yr+' แยกตาม'+(xm==='prov'?'จังหวัด'+(ENT.some(e=>e.type==='gr')?' (รวมกลุ่ม '+ENT.filter(e=>e.type==='gr').map(g=>g.label).join(' / ')+')':''):'สถานี');
-  const sub='Baseline: '+blLabel()+(o.noBL?'':' · ปีที่เลือก '+[...BL.years].sort((a,b)=>a-b).join(', '))+(o.ms?' · เดือน '+monthsLabel(o.ms):'');
+  const sub='Baseline: '+blLabel()+(o.noBL?'':(BL.preset==='match'?' · ปี '+o.yr+' เป็นปี '+ensoLab(o.yr)+' → ใช้ปีสภาวะเดียวกัน: '+((pts[0]&&pts[0].bl.years)||[]).join(', '):' · ปีที่เลือก '+[...BL.years].sort((a,b)=>a-b).join(', ')))+(o.ms?' · เดือน '+monthsLabel(o.ms):'');
   const items=[{k:'box',c:st.bar,t:'ค่าจริงปี '+o.yr+' (สีแท่งตามจังหวัด)'},{k:'box',c:st.barUp,t:'สูงกว่า Mean+SD'},{k:'box',c:st.barDn,t:'ต่ำกว่า Mean−SD'}];
   if(o.showMean)items.push({k:'dot',shape:3,c:'#fff',stroke:st.base,t:'Baseline Mean'+(o.showSD?' ± SD':'')});
-  if(o.showStd)items.push({k:'line',c:st.thc,d:'6 4',t:'มาตรฐานไทย '+TH},{k:'line',c:st.whoc,d:'6 4',t:'WHO '+WHO});
+  if(o.showStd)items.push({k:'line',c:st.thc,d:'6 4',t:sp.tl},{k:'line',c:st.whoc,d:'6 4',t:sp.wl});
   const notes=['แหล่งข้อมูล: '+DS.source,'SD = ส่วนเบี่ยงเบนมาตรฐานตัวอย่าง (n−1)','แต่ละพื้นที่ใช้เฉพาะปีที่'+covTxt()];
   if(xm==='prov')ENT.filter(e=>e.type==='gr').forEach(e=>notes.push(groupNote(e)));
   const f=frame(st,{W,L,R,B,ch,title,sub,items,notes});
   let max=Math.max(0,...pts.map(p=>p.v==null?0:p.v));
   pts.forEach(p=>{if(p.bl.n){if(o.showMean)max=Math.max(max,p.bl.mean);if(o.showSD&&p.bl.up!=null)max=Math.max(max,p.bl.up);}});
-  if(o.showStd)max=Math.max(max,TH);
+  if(o.showStd)max=Math.max(max,sp.th);
   const nt=niceTicks(max*1.1),top=nt.top,N=pts.length||1,cw=W-L-R,band=cw/N,bw=Math.min(46,band*.36);
   const Y=v=>f.T+ch-(v/top)*ch;let hs='';
   let s=axes(st,{L,T:f.T,cw,ch,ticks:nt.ticks,Y,tickFmt:tickF(met)});
-  if(o.showStd){[[TH,st.thc],[WHO,st.whoc]].forEach(a=>{if(a[0]>top)return;const y=Y(a[0]).toFixed(1);s+='<line x1="'+L+'" x2="'+(L+cw)+'" y1="'+y+'" y2="'+y+'" stroke="'+a[1]+'" stroke-width="2.6" stroke-dasharray="8 5"/>';});}
+  if(o.showStd){[[sp.th,st.thc],[sp.who,st.whoc]].forEach(a=>{if(a[0]>top)return;const y=Y(a[0]).toFixed(1);s+='<line x1="'+L+'" x2="'+(L+cw)+'" y1="'+y+'" y2="'+y+'" stroke="'+a[1]+'" stroke-width="2.6" stroke-dasharray="8 5"/>';});}
   pts.forEach((p,i)=>{
     const cx=L+band*(i+.5),bx=cx-bw-2,mx=cx+bw/2+4;
     if(p.v!=null){const col=p.bl.up!=null&&p.v>p.bl.up?st.barUp:p.bl.dn!=null&&p.v<p.bl.dn?st.barDn:(xm==='prov'?p.e.color:st.bar),y=Y(p.v);
@@ -1587,7 +1607,7 @@ function switchSet(id,pg){
   $('ttl').textContent=(DB.meta.title||'PM2.5')+' — ชุดข้อมูล '+DS.label+' ('+DS.sub+')';
   $('sub').textContent='ข้อมูลรายวัน '+(Y0===Y1?Y0:Y0+'–'+Y1)+' · ปรับปรุงล่าสุด '+(DB.meta.updated||'-');
   const sn=$('setnote');sn.style.display=DS.note?'block':'none';sn.textContent=DS.note||'';
-  $('foot').innerHTML='<p><b>นิยาม</b> · เกินมาตรฐาน = ค่าเฉลี่ยรายวันมากกว่าเกณฑ์ (ไทย '+TH+', WHO '+WHO+' µg/m³) · ค่ารายจังหวัด = เฉลี่ยของสถานีในจังหวัดนั้นในแต่ละวัน แล้วจึงสรุปรายเดือน/รายปี · ลำดับคอลัมน์ในทุกตาราง: จังหวัดก่อน แล้วตามด้วยสถานี '+ST.map(s=>s.code).join(', ')+' · RONI = ค่าเฉลี่ย ONI แบบ relative (เลือกช่วงฤดูหมอกควัน/นอกฤดู/ทั้งปีได้ในหน้า Baseline) · <a href="manual.html">คู่มือการอัปเดตข้อมูล</a></p>';
+  $('foot').innerHTML='<p><b>นิยาม</b> · เกินมาตรฐาน = ค่าเฉลี่ยรายวันมากกว่าเกณฑ์รายวัน (ไทย '+TH+', WHO '+WHO+' µg/m³) · ค่าเฉลี่ยรายปีเทียบกับเกณฑ์รายปี (ไทย '+ATH+', WHO '+AWHO+' µg/m³) · ค่ารายจังหวัด = เฉลี่ยของสถานีในจังหวัดนั้นในแต่ละวัน แล้วจึงสรุปรายเดือน/รายปี · ลำดับคอลัมน์ในทุกตาราง: จังหวัดก่อน แล้วตามด้วยสถานี '+ST.map(s=>s.code).join(', ')+' · RONI = ค่าเฉลี่ย ONI แบบ relative (เลือกช่วงฤดูหมอกควัน/นอกฤดู/ทั้งปีได้ในหน้า Baseline) · <a href="manual.html">คู่มือการอัปเดตข้อมูล</a></p>';
   go(pg||'map');
 }
 $('setseg').innerHTML=SETS.map(s=>'<button data-set="'+esc(s.id)+'">'+esc(s.label)+'<small>'+esc(s.sub)+'</small></button>').join('');
